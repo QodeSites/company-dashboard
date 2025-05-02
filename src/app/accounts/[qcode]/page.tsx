@@ -114,7 +114,8 @@ export default function AccountDetailsPage() {
       }
       const json = await res.json();
       console.log("Chart API response data:", json.data);
-      const validData = json.data.filter(row => row.nav != null && !isNaN(parseFloat(row.nav)));
+      // Explicitly type row as Row
+      const validData = json.data.filter((row: Row) => row.nav != null && !isNaN(parseFloat(row.nav.toString())));
       console.log(`Valid NAV records: ${validData.length} out of ${json.data.length}`);
       setChartData(json.data || []);
     } catch (error) {
@@ -124,7 +125,6 @@ export default function AccountDetailsPage() {
       setIsChartLoading(false);
     }
   };
-  
 
   
  
