@@ -1,0 +1,271 @@
+import { NextRequest, NextResponse } from 'next/server';
+import { parse } from 'csv-parse/sync';
+import { prisma } from '@/lib/prisma';
+import { Readable } from 'stream';
+
+async function streamToString(stream: Readable): Promise<string> {
+  const chunks: Uint8Array[] = [];
+  for await (const chunk of stream) {
+    chunks.push(typeof chunk === 'string' ? Buffer.from(chunk) : chunk);
+  }
+  return Buffer.concat(chunks).toString('utf-8');
+}
+
+// Required columns for the master sheet
+const requiredColumns = [
+  'Date',
+  'Portfolio Value',
+  'Cash In/Out',
+  'NAV',
+  'Prev NAV',
+  'PnL',
+  'Daily P/L %',
+  'Exposure Value',
+  'Prev Portfolio Value',
+  'Prev Exposure Value',
+  'Prev Pnl',
+  'Drawdown %',
+  'System Tag',
+];
+
+export async function POST(req: NextRequest) {
+  try {
+    const startTime = Date.now();
+    const formData = await req.formData();
+    const qcode = formData.get('qcode')?.toString().toLowerCase();
+    const file = formData.get('file') as File;
+
+    // Validate inputs
+    if (!qcode || !file) {
+      return NextResponse.json({ message: 'Missing qcode or file' }, { status: 400 });
+    }
+
+    // Sanitize qcode to prevent SQL injection
+    if (!/^[a-z0-9_]+$/.test(qcode)) {
+      return NextResponse.json({ message: 'Invalid qcode format' }, { status: 400 });
+    }
+
+    const tableName = `master_sheet_${qcode}`;
+
+    // Verify table existence
+    const tableExists = await prisma.$queryRawUnsafe(`
+      SELECT EXISTS (
+        SELECT FROM information_schema.tables 
+        WHERE table_schema = 'public' 
+        AND table_name = '${tableName}'
+      )
+    `);
+
+    if (!tableExists[0].exists) {
+      return NextResponse.json({ message: `Table ${tableName} does not exist` }, { status: 400 });
+    }
+
+    // Get CSV content
+    const csvText = await streamToString(file.stream());
+    const csvLines = csvText.split('\n');
+    const csvPreview = csvLines.slice(0, 2).join('\n');
+    console.log('CSV Preview:', csvPreview);
+
+    // Parse CSV
+    const records = parse(csvText, {
+      columns: (header) =>
+        header.map((column: string) =>
+          column.replace(/^\uFEFF/, '').replace(/^\u00EF\u00BB\u00BF/, '').trim()
+        ),
+      skip_empty_lines: true,
+      trim: true,
+      relax_column_count: true,
+      bom: true,
+    });
+
+    console.log('Total Records:', records.length);
+
+    if (records.length === 0) {
+      return NextResponse.json({ message: 'CSV file is empty or has no valid rows' }, { status: 400 });
+    }
+
+    const columnNames = Object.keys(records[0]);
+    console.log('CSV Columns:', columnNames);
+
+    // Validate required columns
+    const missingColumns = requiredColumns.filter((col) => !columnNames.includes(col));
+    if (missingColumns.length > 0) {
+      return NextResponse.json(
+        { message: `Missing required columns: ${missingColumns.join(', ')}` },
+        { status: 400 }
+      );
+    }
+
+    let successCount = 0;
+    let failedRows: { rowIndex: number; row: any; error: string }[] = [];
+
+    // Truncate the table in a short transaction
+    await prisma.$transaction(
+      async (tx) => {
+        console.log('Starting TRUNCATE');
+        const truncateStart = Date.now();
+        await tx.$executeRawUnsafe(`TRUNCATE TABLE ${tableName}`);
+        console.log('TRUNCATE Duration:', Date.now() - truncateStart, 'ms');
+      },
+      { timeout: 5000 } // Short timeout for truncate
+    );
+
+    // Process and insert rows in batches outside a transaction
+    const batchSize = 500; // Smaller batch size for bulk inserts
+    for (let i = 0; i < records.length; i += batchSize) {
+      const batch = records.slice(i, i + batchSize);
+      const batchStart = Date.now();
+      console.log(`Processing batch ${i / batchSize + 1} (${batch.length} rows)`);
+
+      // Prepare values for bulk insert
+      const values: any[] = [];
+      const placeholders: string[] = [];
+
+      for (const [index, row] of batch.entries()) {
+        try {
+          let parsedDate: Date | null = null;
+          if (row['Date']) {
+            parsedDate = new Date(row['Date']);
+            if (isNaN(parsedDate.getTime())) {
+              throw new Error(`Invalid date format: ${row['Date']}`);
+            }
+          }
+
+          const safeParseFloat = (value: any): number | null => {
+            if (value === undefined || value === null || value === '') return null;
+            const parsed = parseFloat(value);
+            return isNaN(parsed) ? null : parsed;
+          };
+
+          const systemTagKey = Object.keys(row).find(
+            (key) =>
+              key === 'System Tag' ||
+              key.replace(/^\uFEFF/, '').replace(/^\u00EF\u00BB\u00BF/, '').trim() === 'System Tag'
+          );
+
+          const rowValues = [
+            qcode,
+            parsedDate,
+            safeParseFloat(row['Portfolio Value']),
+            safeParseFloat(row['Cash In/Out']),
+            safeParseFloat(row['NAV']),
+            safeParseFloat(row['Prev NAV']),
+            safeParseFloat(row['PnL']),
+            safeParseFloat(row['Daily P/L %']),
+            safeParseFloat(row['Exposure Value']),
+            safeParseFloat(row['Prev Portfolio Value']),
+            safeParseFloat(row['Prev Exposure Value']),
+            safeParseFloat(row['Prev Pnl']),
+            safeParseFloat(row['Drawdown %']),
+            systemTagKey ? row[systemTagKey] : null,
+          ];
+
+          if (!parsedDate) {
+            throw new Error('Missing required field: Date');
+          }
+
+          if (!systemTagKey || row[systemTagKey] === undefined || row[systemTagKey] === null || row[systemTagKey] === '') {
+            throw new Error('Missing required field: System Tag');
+          }
+
+          // Add values and placeholder for bulk insert
+          values.push(...rowValues);
+          placeholders.push(`($${values.length - 13 + 1}, $${values.length - 12 + 1}, $${values.length - 11 + 1}, $${values.length - 10 + 1}, $${values.length - 9 + 1}, $${values.length - 8 + 1}, $${values.length - 7 + 1}, $${values.length - 6 + 1}, $${values.length - 5 + 1}, $${values.length - 4 + 1}, $${values.length - 3 + 1}, $${values.length - 2 + 1}, $${values.length - 1 + 1}, $${values.length})`);
+        } catch (err: any) {
+          failedRows.push({
+            rowIndex: i + index + 1,
+            row: Object.entries(row).reduce((acc, [key, value]) => {
+              acc[key] = typeof value === 'string' && value.length > 50 ? value.substring(0, 50) + '...' : value;
+              return acc;
+            }, {} as Record<string, any>),
+            error: err.message || 'Unknown error',
+          });
+        }
+      }
+
+      // Execute bulk insert for valid rows
+      if (placeholders.length > 0) {
+        try {
+          const insertQuery = `
+            INSERT INTO ${tableName} (
+              qcode, date, portfolio_value, capital_in_out, nav, prev_nav, pnl, daily_p_l,
+              exposure_value, prev_portfolio_value, prev_exposure_value, prev_pnl, drawdown, system_tag
+            ) VALUES ${placeholders.join(', ')}
+          `;
+          await prisma.$executeRawUnsafe(insertQuery, ...values);
+          successCount += placeholders.length;
+        } catch (err: any) {
+          // If bulk insert fails, fall back to individual inserts for better error isolation
+          for (const [index, row] of batch.entries()) {
+            try {
+              const rowValues = [
+                qcode,
+                row['Date'] ? new Date(row['Date']) : null,
+                parseFloat(row['Portfolio Value']),
+                parseFloat(row['Cash In/Out']),
+                parseFloat(row['NAV']),
+                parseFloat(row['Prev NAV']),
+                parseFloat(row['PnL']),
+                parseFloat(row['Daily P/L %']),
+                parseFloat(row['Exposure Value']),
+                parseFloat(row['Prev Portfolio Value']),
+                parseFloat(row['Prev Exposure Value']),
+                parseFloat(row['Prev Pnl']),
+                parseFloat(row['Drawdown %']),
+                row['System Tag'] || null,
+              ];
+
+              if (!rowValues[1]) throw new Error('Missing required field: Date');
+              if (!rowValues[13]) throw new Error('Missing required field: System Tag');
+
+              await prisma.$executeRawUnsafe(
+                `
+                INSERT INTO ${tableName} (
+                  qcode, date, portfolio_value, capital_in_out, nav, prev_nav, pnl, daily_p_l,
+                  exposure_value, prev_portfolio_value, prev_exposure_value, prev_pnl, drawdown, system_tag
+                ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)
+              `,
+                ...rowValues
+              );
+              successCount++;
+            } catch (err: any) {
+              failedRows.push({
+                rowIndex: i + index + 1,
+                row: Object.entries(row).reduce((acc, [key, value]) => {
+                  acc[key] = typeof value === 'string' && value.length > 50 ? value.substring(0, 50) + '...' : value;
+                  return acc;
+                }, {} as Record<string, any>),
+                error: err.message || 'Unknown error',
+              });
+            }
+          }
+        }
+      }
+
+      console.log(`Batch ${i / batchSize + 1} Duration:`, Date.now() - batchStart, 'ms');
+    }
+
+    const totalDuration = Date.now() - startTime;
+    console.log('Total Operation Duration:', totalDuration, 'ms');
+
+    const message = `Master sheet replaced successfully. Inserted ${successCount} rows. ${failedRows.length > 0 ? `${failedRows.length} rows failed to insert.` : ''
+      }`;
+
+    return NextResponse.json({
+      message,
+      totalRows: records.length,
+      insertedRows: successCount,
+      columnNames,
+      firstError: failedRows.length ? failedRows[0] : null,
+      failedRows: failedRows.length ? failedRows.slice(0, 10) : [],
+    });
+  } catch (error: any) {
+    console.error('POST /api/replace-master-sheet error:', error);
+    return NextResponse.json(
+      { message: `❌ Error replacing master sheet: ${error.message}` },
+      { status: 500 }
+    );
+  } finally {
+    await prisma.$disconnect();
+  }
+}
