@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { parse } from "csv-parse/sync";
-import { PrismaClient } from "@prisma/client";
+import { PrismaClient, Prisma } from "@prisma/client";
 
 const prisma = new PrismaClient();
 
@@ -47,16 +47,18 @@ export async function POST(req: NextRequest) {
   const tableName = `master_sheet_${qcode}`;
 
   try {
-    // Verify table existence
-    const tableExists = await prisma.$queryRawUnsafe<{ exists: boolean }[]>(
-      `SELECT EXISTS (
+    // Check if table exists using Prisma's queryRaw with proper Sql template literals
+    const result = await prisma.$queryRaw(
+      Prisma.sql`SELECT EXISTS (
         SELECT FROM information_schema.tables 
         WHERE table_schema = 'public' 
-        AND table_name = '${tableName}'
-      )`
+        AND table_name = ${tableName}
+      ) as "exists"`
     );
 
-    if (!tableExists[0].exists) {
+    const tableExists = result[0]?.exists;
+
+    if (!tableExists) {
       return NextResponse.json({ message: `Table ${tableName} does not exist` }, { status: 400 });
     }
 
@@ -134,69 +136,44 @@ export async function POST(req: NextRequest) {
           return isNaN(parsed) ? null : parsed;
         };
 
-        const values = [
-          qcode,
-          parsedDate,
-          safeParseFloat(row["Portfolio Value"]),
-          safeParseFloat(row["Cash In/Out"]),
-          safeParseFloat(row["NAV"]),
-          safeParseFloat(row["Prev NAV"]),
-          safeParseFloat(row["PnL"]),
-          safeParseFloat(row["Daily P/L %"]),
-          safeParseFloat(row["Exposure Value"]),
-          safeParseFloat(row["Prev Portfolio Value"]),
-          safeParseFloat(row["Prev Exposure Value"]),
-          safeParseFloat(row["Prev Pnl"]),
-          safeParseFloat(row["Drawdown %"]),
-          (() => {
-            const systemTagKey = Object.keys(row).find(
-              (key) =>
-                key === "System Tag" ||
-                key.replace(/^\uFEFF/, "").replace(/^\u00EF\u00BB\u00BF/, "").trim() === "System Tag"
-            );
-            return systemTagKey ? row[systemTagKey] : null;
-          })(),
-        ];
-
-        if (!parsedDate) {
-          throw new Error("Missing required field: Date");
-        }
-
         const systemTagKey = Object.keys(row).find(
           (key) =>
             key === "System Tag" ||
             key.replace(/^\uFEFF/, "").replace(/^\u00EF\u00BB\u00BF/, "").trim() === "System Tag"
         );
 
+        if (!parsedDate) {
+          throw new Error("Missing required field: Date");
+        }
+
         if (!systemTagKey || row[systemTagKey] === undefined || row[systemTagKey] === null || row[systemTagKey] === "") {
           throw new Error("Missing required field: System Tag");
         }
 
-        const insertQuery = `
-          INSERT INTO ${tableName} (
-            qcode, date, portfolio_value, capital_in_out, nav, prev_nav, pnl, daily_p_l,
-            exposure_value, prev_portfolio_value, prev_exposure_value, prev_pnl, drawdown, system_tag
-          ) VALUES (
-            $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14
-          )
-        `;
+        const portfolioValue = safeParseFloat(row["Portfolio Value"]);
+        const cashInOut = safeParseFloat(row["Cash In/Out"]);
+        const nav = safeParseFloat(row["NAV"]);
+        const prevNav = safeParseFloat(row["Prev NAV"]);
+        const pnl = safeParseFloat(row["PnL"]);
+        const dailyPL = safeParseFloat(row["Daily P/L %"]);
+        const exposureValue = safeParseFloat(row["Exposure Value"]);
+        const prevPortfolioValue = safeParseFloat(row["Prev Portfolio Value"]);
+        const prevExposureValue = safeParseFloat(row["Prev Exposure Value"]);
+        const prevPnl = safeParseFloat(row["Prev Pnl"]);
+        const drawdown = safeParseFloat(row["Drawdown %"]);
+        const systemTag = systemTagKey ? row[systemTagKey] : null;
 
-        await prisma.$executeRawUnsafe(
-          insertQuery,
-          values[0],
-          values[1],
-          values[2],
-          values[3],
-          values[4],
-          values[5],
-          values[6],
-          values[7],
-          values[8],
-          values[9],
-          values[10],
-          values[11],
-          values[12],
-          values[13]
+        await prisma.$executeRaw(
+          Prisma.sql`
+            INSERT INTO ${Prisma.raw(tableName)} (
+              qcode, date, portfolio_value, capital_in_out, nav, prev_nav, pnl, daily_p_l,
+              exposure_value, prev_portfolio_value, prev_exposure_value, prev_pnl, drawdown, system_tag
+            ) VALUES (
+              ${qcode}, ${parsedDate}, ${portfolioValue}, ${cashInOut}, ${nav}, ${prevNav}, ${pnl}, 
+              ${dailyPL}, ${exposureValue}, ${prevPortfolioValue}, ${prevExposureValue}, ${prevPnl}, 
+              ${drawdown}, ${systemTag}
+            )
+          `
         );
 
         successCount++;
@@ -224,7 +201,7 @@ export async function POST(req: NextRequest) {
     const errorMessage = err instanceof Error ? err.message : "An unexpected error occurred";
     console.error("CSV Upload Error:", err);
     const errorDetails =
-      err instanceof Error && "code" in err && typeof err.code === "string" ? `Error Code: ${err.code}` : undefined;
+      err instanceof Error && "code" in err && typeof (err as any).code === "string" ? `Error Code: ${(err as any).code}` : undefined;
     return NextResponse.json(
       { message: "Upload failed", error: errorMessage, details: errorDetails },
       { status: 500 }

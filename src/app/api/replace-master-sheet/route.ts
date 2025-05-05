@@ -1,7 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { parse } from 'csv-parse/sync';
 import { prisma } from '@/lib/prisma';
+import { Prisma } from '@prisma/client';
 import { safeParseFloat } from '@/utils/safeParseFloat';
+
 // Convert ReadableStream to string
 async function streamToString(stream: ReadableStream<Uint8Array>): Promise<string> {
   const reader = stream.getReader();
@@ -50,16 +52,18 @@ export async function POST(req: NextRequest) {
 
     const tableName = `master_sheet_${qcode}`;
 
-    // Verify table existence
-    const tableExists = await prisma.$queryRawUnsafe<{ exists: boolean }[]>(
-      `SELECT EXISTS (
+    // Check if table exists using Prisma's queryRaw with proper Sql template literals
+    const result = await prisma.$queryRaw(
+      Prisma.sql`SELECT EXISTS (
         SELECT FROM information_schema.tables 
         WHERE table_schema = 'public' 
-        AND table_name = '${tableName}'
-      )`
+        AND table_name = ${tableName}
+      ) as "exists"`
     );
 
-    if (!tableExists[0].exists) {
+    const tableExists = result[0]?.exists;
+
+    if (!tableExists) {
       return NextResponse.json({ message: `Table ${tableName} does not exist` }, { status: 400 });
     }
 
@@ -107,7 +111,7 @@ export async function POST(req: NextRequest) {
       async (tx) => {
         console.log('Starting TRUNCATE');
         const truncateStart = Date.now();
-        await tx.$executeRawUnsafe(`TRUNCATE TABLE ${tableName}`);
+        await tx.$executeRaw(Prisma.sql`TRUNCATE TABLE ${Prisma.raw(tableName)}`);
         console.log('TRUNCATE Duration:', Date.now() - truncateStart, 'ms');
       },
       { timeout: 5000 } // Short timeout for truncate
@@ -190,13 +194,14 @@ export async function POST(req: NextRequest) {
       // Execute bulk insert for valid rows
       if (placeholders.length > 0) {
         try {
-          const insertQuery = `
-            INSERT INTO ${tableName} (
+          // Use Prisma.raw for the table name and generate a SQL template
+          const insertQuery = Prisma.sql`
+            INSERT INTO ${Prisma.raw(tableName)} (
               qcode, date, portfolio_value, capital_in_out, nav, prev_nav, pnl, daily_p_l,
               exposure_value, prev_portfolio_value, prev_exposure_value, prev_pnl, drawdown, system_tag
-            ) VALUES ${placeholders.join(', ')}
+            ) VALUES ${Prisma.raw(placeholders.join(', '))}
           `;
-          await prisma.$executeRawUnsafe(insertQuery, ...values);
+          await prisma.$executeRaw(insertQuery, ...values);
           successCount += placeholders.length;
         } catch {
           // If bulk insert fails, fall back to individual inserts
@@ -222,14 +227,15 @@ export async function POST(req: NextRequest) {
               if (!rowValues[1]) throw new Error('Missing required field: Date');
               if (!rowValues[13]) throw new Error('Missing required field: System Tag');
 
-              await prisma.$executeRawUnsafe(
-                `
-                INSERT INTO ${tableName} (
+              await prisma.$executeRaw(
+                Prisma.sql`
+                INSERT INTO ${Prisma.raw(tableName)} (
                   qcode, date, portfolio_value, capital_in_out, nav, prev_nav, pnl, daily_p_l,
                   exposure_value, prev_portfolio_value, prev_exposure_value, prev_pnl, drawdown, system_tag
-                ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)
-              `,
-                ...rowValues
+                ) VALUES (${rowValues[0]}, ${rowValues[1]}, ${rowValues[2]}, ${rowValues[3]}, ${rowValues[4]}, 
+                          ${rowValues[5]}, ${rowValues[6]}, ${rowValues[7]}, ${rowValues[8]}, ${rowValues[9]}, 
+                          ${rowValues[10]}, ${rowValues[11]}, ${rowValues[12]}, ${rowValues[13]})
+              `
               );
               successCount++;
             } catch (err: unknown) {

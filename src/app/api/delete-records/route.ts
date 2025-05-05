@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { PrismaClient } from "@prisma/client";
+import { PrismaClient, Prisma } from "@prisma/client";
 
 const prisma = new PrismaClient();
 
@@ -29,25 +29,27 @@ export async function POST(req: NextRequest) {
 
     const tableName = `master_sheet_${qcode.toLowerCase()}`;
 
-    // Verify table existence
-    const tableExists = await prisma.$queryRawUnsafe<{ exists: boolean }[]>(
-      `SELECT EXISTS (
+    // Check if table exists using Prisma's queryRaw with proper Sql template literals
+    const result = await prisma.$queryRaw(
+      Prisma.sql`SELECT EXISTS (
         SELECT FROM information_schema.tables 
         WHERE table_schema = 'public' 
-        AND table_name = '${tableName}'
-      )`
+        AND table_name = ${tableName}
+      ) as "exists"`
     );
 
-    if (!tableExists[0].exists) {
+    const tableExists = result[0]?.exists;
+
+    if (!tableExists) {
       return NextResponse.json({ message: `Table ${tableName} does not exist` }, { status: 400 });
     }
 
     // Delete records for the specified date range with explicit parameter casting
-    const deleteQuery = `
-      DELETE FROM ${tableName}
-      WHERE date >= $1::date AND date <= $2::date
-    `;
-    const deletedCount = await prisma.$executeRawUnsafe(deleteQuery, startDate, endDate);
+    const deletedCount = await prisma.$executeRaw(
+      Prisma.sql`DELETE FROM ${Prisma.raw(tableName)}
+      WHERE date >= ${startDate}::date AND date <= ${endDate}::date`
+    );
+    
     console.log(`Deleted ${deletedCount} rows for date range: ${startDate} to ${endDate}`);
 
     return NextResponse.json({
@@ -57,7 +59,7 @@ export async function POST(req: NextRequest) {
   } catch (err: unknown) {
     const errorMessage = err instanceof Error ? err.message : "An unexpected error occurred";
     console.error("Delete Records Error:", err);
-    const errorDetails = err instanceof Error && "code" in err ? `Error Code: ${err.code}` : undefined;
+    const errorDetails = err instanceof Error && "code" in err ? `Error Code: ${(err as any).code}` : undefined;
     return NextResponse.json(
       { message: errorMessage, error: errorMessage, details: errorDetails },
       { status: 500 }
