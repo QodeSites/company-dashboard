@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { PrismaClient, Prisma } from "@prisma/client";
+import { Prisma, PrismaClient } from "@prisma/client";
 
 const prisma = new PrismaClient();
 
@@ -29,13 +29,15 @@ export async function POST(req: NextRequest) {
 
     const tableName = `master_sheet_${qcode.toLowerCase()}`;
 
-    // Check if table exists using Prisma's queryRaw with proper Sql template literals
-    const result = await prisma.$queryRaw(
-      Prisma.sql`SELECT EXISTS (
-        SELECT FROM information_schema.tables 
-        WHERE table_schema = 'public' 
-        AND table_name = ${tableName}
-      ) as "exists"`
+    // Check if table exists using Prisma's queryRaw
+    const result = await prisma.$queryRaw<{ exists: boolean }[]>(
+      Prisma.sql`
+        SELECT EXISTS (
+          SELECT FROM information_schema.tables 
+          WHERE table_schema = 'public' 
+          AND table_name = ${tableName}
+        ) as "exists"
+      `
     );
 
     const tableExists = result[0]?.exists;
@@ -44,12 +46,18 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ message: `Table ${tableName} does not exist` }, { status: 400 });
     }
 
-    // Delete records for the specified date range with explicit parameter casting
+    // Convert string dates to Date objects for proper parameter handling
+    const startDateObj = new Date(startDate);
+    const endDateObj = new Date(endDate);
+
+    // Delete records for the specified date range
     const deletedCount = await prisma.$executeRaw(
-      Prisma.sql`DELETE FROM ${Prisma.raw(tableName)}
-      WHERE date >= ${startDate}::date AND date <= ${endDate}::date`
+      Prisma.sql`
+        DELETE FROM ${Prisma.raw(tableName)}
+        WHERE date >= ${startDateObj} AND date <= ${endDateObj}
+      `
     );
-    
+
     console.log(`Deleted ${deletedCount} rows for date range: ${startDate} to ${endDate}`);
 
     return NextResponse.json({
