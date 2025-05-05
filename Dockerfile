@@ -20,16 +20,24 @@ FROM node:20-alpine AS runner
 
 WORKDIR /app
 
-# Set non-root user for security
+# Create non-root user and group
 RUN addgroup -g 1001 -S nodejs && adduser -S nextjs -u 1001
-USER nextjs
 
-# Copy only necessary files from builder
+# Set ownership of /app to nextjs user before copying files
+RUN chown nextjs:nodejs /app
+
+# Copy only necessary files from builder with correct ownership
 COPY --from=builder --chown=nextjs:nodejs /app/.next ./.next
 COPY --from=builder --chown=nextjs:nodejs /app/public ./public
 COPY --from=builder --chown=nextjs:nodejs /app/prisma ./prisma
 COPY --from=builder --chown=nextjs:nodejs /app/package.json ./package.json
 COPY --from=builder --chown=nextjs:nodejs /app/package-lock.json ./package-lock.json
+
+# Switch to non-root user
+USER nextjs
+
+# Set npm cache directory and ensure permissions
+RUN mkdir -p /home/nextjs/.npm && chown nextjs:nodejs /home/nextjs/.npm
 
 # Install only production dependencies
 RUN npm ci --omit=dev
