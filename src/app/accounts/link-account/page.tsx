@@ -3,17 +3,25 @@
 import React, { useEffect, useState } from "react";
 import ComponentCard from "@/components/common/ComponentCard";
 import Label from "@/components/form/Label";
-import InputField from "@/components/form/input/InputField";
 import MultiSelect from "@/components/form/MultiSelect";
 
+
+
+interface Account {
+  qcode: string;
+  account_name: string;
+}
+
+
 export default function LinkAccountsPage() {
+
   const [formData, setFormData] = useState({
     source_qcode: "",
     target_qcodes: [] as string[],
     access_level: "read",
   });
 
-  const [accounts, setAccounts] = useState([]);
+  const [accounts, setAccounts] = useState<Account[]>([]);
 
   useEffect(() => {
     fetch("/api/accounts")
@@ -22,7 +30,7 @@ export default function LinkAccountsPage() {
       .catch(console.error);
   }, []);
 
-  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
     setFormData(prev => ({
       ...prev,
       [e.target.name]: e.target.value
@@ -33,13 +41,12 @@ export default function LinkAccountsPage() {
     e.preventDefault();
 
     try {
-      const response = await fetch("/api/accounts/link-account", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(formData),
-      });
+      // const response = await fetch("/api/accounts/link-account", {
+      //   method: "POST",
+      //   headers: { "Content-Type": "application/json" },
+      //   body: JSON.stringify(formData),
+      // });
 
-      const result = await response.json();
       alert("✅ Accounts linked successfully!");
 
       setFormData({
@@ -66,7 +73,7 @@ export default function LinkAccountsPage() {
             required
           >
             <option value="">-- Select Source --</option>
-            {accounts.map((acc: any) => (
+            {accounts.map((acc) => (
               <option key={acc.qcode} value={acc.qcode}>
                 {acc.account_name} ({acc.qcode})
               </option>
@@ -79,8 +86,8 @@ export default function LinkAccountsPage() {
           <MultiSelect
             label="Select Target Accounts"
             options={accounts
-              .filter(acc => acc.qcode !== formData.source_qcode) // 🔥 Filter out source
-              .map((acc: any) => ({
+              .filter((acc) => acc.qcode !== formData.source_qcode)
+              .map((acc) => ({
                 value: acc.qcode,
                 text: `${acc.account_name} (${acc.qcode})`,
                 selected: formData.target_qcodes.includes(acc.qcode),

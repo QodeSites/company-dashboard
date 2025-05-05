@@ -3,11 +3,11 @@ import { prisma } from "@/lib/prisma";
 
 export async function GET(
   req: NextRequest,
-  { params }: { params: Promise<{ icode: string }> } // Type params as a Promise
+  { params }: { params: Promise<{ icode: string }> }
 ) {
-  const { icode } = await params; // Await params to resolve icode
-
   try {
+    const { icode } = await params;
+    
     const allocations = await prisma.pooled_account_allocations.findMany({
       where: { icode },
       select: {
@@ -28,11 +28,11 @@ export async function GET(
 
     // Transform the response to match the frontend's Allocation interface
     const formattedAllocations = allocations.map((alloc) => ({
-      qcode: alloc.qcode,
-      account_name: alloc.accounts.account_name,
+      qcode: alloc.qcode || "",
+      account_name: alloc.accounts?.account_name || "Unknown Account",
       allocation_date: alloc.allocation_date.toISOString().split("T")[0], // Format as YYYY-MM-DD
-      contribution_amount: alloc.contribution_amount.toString(), // Convert to string
-      allocation_percent: alloc.allocation_percent.toString(), // Convert to string
+      contribution_amount: alloc.contribution_amount?.toString() || "0", // Handle null with default value
+      allocation_percent: alloc.allocation_percent?.toString() || "0", // Handle null with default value
     }));
 
     return NextResponse.json(formattedAllocations);

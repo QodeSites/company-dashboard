@@ -62,9 +62,11 @@ export default function AccountsTable() {
       setAccounts(accounts.filter((acc) => acc.qcode !== qcode));
 
       alert(`Success: Account ${qcode} deleted successfully`);
-    } catch (error: any) {
+    } catch (error: unknown) {
+      const errorMessage = error instanceof Error ? error.message : 'An unexpected error occurred';
+    
       console.error("Error deleting account:", error);
-      alert(`Error: ${error.message || "An error occurred while deleting the account"}`);
+      alert(`Error: ${errorMessage || "An error occurred while deleting the account"}`);
     } finally {
       setIsDeleting(null);
     }
@@ -154,7 +156,7 @@ export default function AccountsTable() {
                     ))
                   ) : (
                     <TableRow>
-                      <TableCell colSpan={3} className="px-5 py-4 text-center text-theme-sm text-gray-700 dark:text-white/90">
+                      <TableCell className="px-5 py-4 text-center text-theme-sm text-gray-700 dark:text-white/90">
                         No linked accounts found.
                       </TableCell>
                     </TableRow>

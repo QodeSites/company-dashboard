@@ -2,9 +2,7 @@
 
 import React, { useEffect, useState } from "react";
 import ComponentCard from "@/components/common/ComponentCard";
-import { Table, TableHeader, TableRow, TableCell, TableBody } from "@/components/ui/table";
 import Breadcrumb from "@/components/breadcrumb/breadcrumb";
-import Link from "next/link";
 import Spinner from "@/components/spinners/Spinner";
 import AccountsTable from "@/components/accounts/AccountsTable";
 
@@ -18,16 +16,8 @@ type AccountDashboardData = {
   recentAccounts: { qcode: string; account_name: string }[];
 };
 
-interface Account {
-  qcode: string;
-  account_name: string;
-  type: string;
-  user_name: string;
-}
-
 export default function AccountsDashboard() {
   const [data, setData] = useState<AccountDashboardData | null>(null);
-  const [accounts, setAccounts] = useState<Account[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -49,14 +39,13 @@ export default function AccountsDashboard() {
           throw new Error("Failed to fetch dashboard data");
         }
 
-        const accountsData = await accountsRes.json();
         const dashboardData = await dashboardRes.json();
 
-        setAccounts(accountsData);
         setData(dashboardData);
-      } catch (err: any) {
-        console.error("Error fetching data:", err);
-        setError(err.message || "An error occurred while loading data");
+      } catch (err: unknown) {
+        const errorMessage = err instanceof Error ? err.message : 'An unexpected error occurred';
+        console.error("Error fetching data:", errorMessage);
+        setError(errorMessage || "An error occurred while loading data");
       } finally {
         setIsLoading(false);
       }

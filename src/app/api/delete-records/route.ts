@@ -30,13 +30,13 @@ export async function POST(req: NextRequest) {
     const tableName = `master_sheet_${qcode.toLowerCase()}`;
 
     // Verify table existence
-    const tableExists = await prisma.$queryRawUnsafe(`
-      SELECT EXISTS (
+    const tableExists = await prisma.$queryRawUnsafe<{ exists: boolean }[]>(
+      `SELECT EXISTS (
         SELECT FROM information_schema.tables 
         WHERE table_schema = 'public' 
         AND table_name = '${tableName}'
-      )
-    `);
+      )`
+    );
 
     if (!tableExists[0].exists) {
       return NextResponse.json({ message: `Table ${tableName} does not exist` }, { status: 400 });
@@ -54,10 +54,10 @@ export async function POST(req: NextRequest) {
       message: `Deleted ${deletedCount} rows successfully`,
       deletedCount,
     });
-  } catch (err: any) {
+  } catch (err: unknown) {
+    const errorMessage = err instanceof Error ? err.message : "An unexpected error occurred";
     console.error("Delete Records Error:", err);
-    const errorMessage = err.message || "Deletion failed";
-    const errorDetails = err.code ? `Error Code: ${err.code}` : undefined;
+    const errorDetails = err instanceof Error && "code" in err ? `Error Code: ${err.code}` : undefined;
     return NextResponse.json(
       { message: errorMessage, error: errorMessage, details: errorDetails },
       { status: 500 }

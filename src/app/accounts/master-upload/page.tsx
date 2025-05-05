@@ -4,13 +4,43 @@ import React, { useEffect, useState, useRef } from "react";
 import ComponentCard from "@/components/common/ComponentCard";
 import Label from "@/components/form/Label";
 import Select from "@/components/form/Select";
-import InputField from "@/components/form/input/InputField";
 import DatePicker from "@/components/form/date-picker";
 import { Table, TableBody, TableCell, TableHeader, TableRow } from "@/components/ui/table";
 import Spinner from "@/components/spinners/Spinner";
 
+interface Account {
+  qcode: string;
+  account_name: string;
+  account_type: string;
+}
+
+interface SelectOption {
+  value: string;
+  label: string;
+}
+
+
+interface UploadResponse {
+  message: string;
+  totalRows?: number;
+  insertedRows?: number;
+  deletedCount?: number;
+  failedRows?: Array<{
+    rowIndex: number;
+    error: string;
+    row: Record<string, unknown>; // Changed 'any' to 'unknown'
+  }>;
+  firstError?: {
+    error: string;
+    rowIndex: number;
+    rawDate: string;
+    rawSystemTag: string;
+  };
+  columnNames?: string[];
+}
+
 export default function MasterUploadPage() {
-  const [accounts, setAccounts] = useState([]);
+  const [accounts, setAccounts] = useState<SelectOption[]>([]);
   const [selectedQcode, setSelectedQcode] = useState("");
   const [file, setFile] = useState<File | null>(null);
   const [isLoading, setIsLoading] = useState(false);
@@ -20,7 +50,7 @@ export default function MasterUploadPage() {
   const [operationType, setOperationType] = useState<
     "upload" | "combined" | "replace" | "delete" | null
   >(null);
-  const [operationResult, setOperationResult] = useState<any>(null);
+  const [operationResult, setOperationResult] = useState<UploadResponse | null>(null);
   const [csvPreview, setCsvPreview] = useState<string[]>([]);
   const [filterStartDate, setFilterStartDate] = useState<string | null>(null);
   const [filterEndDate, setFilterEndDate] = useState<string | null>(null);
@@ -49,8 +79,8 @@ export default function MasterUploadPage() {
         if (!res.ok) {
           throw new Error("Failed to fetch accounts");
         }
-        const json = await res.json();
-        const formatted = json.map((acc: any) => ({
+        const json: Account[] = await res.json();
+        const formatted: SelectOption[] = json.map((acc) => ({
           value: acc.qcode,
           label: `${acc.qcode.toUpperCase()} - ${acc.account_name} (${acc.account_type})`,
         }));
@@ -168,7 +198,7 @@ export default function MasterUploadPage() {
       xhr.upload.addEventListener("load", () => {
         setIsProcessing(true);
       });
-      const response = await new Promise((resolve, reject) => {
+      const response: UploadResponse = await new Promise((resolve, reject) => {
         xhr.open("POST", "/api/upload-csv");
         xhr.onload = () => {
           if (xhr.status >= 200 && xhr.status < 300) {
@@ -181,7 +211,7 @@ export default function MasterUploadPage() {
         xhr.send(formData);
       });
       setOperationResult(response);
-      if (response.message.includes("0 rows inserted")) {
+      if (response.totalRows === 0 || response.insertedRows === 0) {
         console.error("Upload details:", response);
         const errorMessage = response.firstError
           ? `First error: ${response.firstError.error} (Row ${response.firstError.rowIndex}, Date: ${response.firstError.rawDate}, System Tag: ${response.firstError.rawSystemTag})`
@@ -189,14 +219,15 @@ export default function MasterUploadPage() {
         alert(`⚠️ ${response.message}\n${errorMessage}\nCheck Operation Result for details on failed rows.`);
       } else {
         const message = `${response.message}${
-          response.failedRows.length > 0
-            ? `\nFirst error: ${response.firstError.error} (Row ${response.firstError.rowIndex}, Date: ${response.firstError.rawDate}, System Tag: ${response.firstError.rawSystemTag})\nCheck Operation Result for details on ${response.failedRows.length} failed rows.`
+          response.failedRows && response.failedRows.length > 0
+            ? `\nFirst error: ${response.firstError?.error} (Row ${response.firstError?.rowIndex}, Date: ${response.firstError?.rawDate}, System Tag: ${response.firstError?.rawSystemTag})\nCheck Operation Result for details on ${response.failedRows.length} failed rows.`
             : ""
         }`;
         alert(`✅ ${message}`);
       }
-    } catch (err: any) {
-      alert(`❌ Upload failed: ${err.message}`);
+    } catch (err: unknown) {
+      const errorMessage = err instanceof Error ? err.message : "An unexpected error occurred";
+      alert(`❌ Upload failed: ${errorMessage}`);
       console.error(err);
     } finally {
       setIsLoading(false);
@@ -233,14 +264,15 @@ export default function MasterUploadPage() {
           endDate: filterEndDate,
         }),
       });
-      const response = await res.json();
+      const response: UploadResponse = await res.json();
       if (!res.ok) {
         throw new Error(response.message || "Deletion failed");
       }
       setOperationResult(response);
       alert(`✅ ${response.message}`);
-    } catch (err: any) {
-      alert(`❌ Deletion failed: ${err.message}`);
+    } catch (err: unknown) {
+      const errorMessage = err instanceof Error ? err.message : "An unexpected error occurred";
+      alert(`❌ Deletion failed: ${errorMessage}`);
       console.error(err);
     } finally {
       setIsDeleting(false);
@@ -275,7 +307,7 @@ export default function MasterUploadPage() {
           endDate: filterEndDate,
         }),
       });
-      const deleteResponse = await deleteRes.json();
+      const deleteResponse: UploadResponse = await deleteRes.json();
       if (!deleteRes.ok) {
         throw new Error(deleteResponse.message || "Deletion failed");
       }
@@ -294,7 +326,7 @@ export default function MasterUploadPage() {
       xhr.upload.addEventListener("load", () => {
         setIsProcessing(true);
       });
-      const uploadResponse = await new Promise((resolve, reject) => {
+      const uploadResponse: UploadResponse = await new Promise((resolve, reject) => {
         xhr.open("POST", "/api/upload-csv");
         xhr.onload = () => {
           if (xhr.status >= 200 && xhr.status < 300) {
@@ -315,13 +347,14 @@ export default function MasterUploadPage() {
         failedRows: uploadResponse.failedRows,
       });
       const message = `${deleteResponse.message}. ${uploadResponse.message}${
-        uploadResponse.failedRows.length > 0
-          ? `\nFirst error: ${uploadResponse.firstError.error} (Row ${uploadResponse.firstError.rowIndex}, Date: ${uploadResponse.firstError.rawDate}, System Tag: ${uploadResponse.firstError.rawSystemTag})\nCheck Operation Result for details on ${uploadResponse.failedRows.length} failed rows.`
+        uploadResponse.failedRows && uploadResponse.failedRows.length > 0
+          ? `\nFirst error: ${uploadResponse.firstError?.error} (Row ${uploadResponse.firstError?.rowIndex}, Date: ${uploadResponse.firstError?.rawDate}, System Tag: ${uploadResponse.firstError?.rawSystemTag})\nCheck Operation Result for details on ${uploadResponse.failedRows.length} failed rows.`
           : ""
       }`;
       alert(`✅ ${message}`);
-    } catch (err: any) {
-      alert(`❌ Operation failed: ${err.message}`);
+    } catch (err: unknown) {
+      const errorMessage = err instanceof Error ? err.message : "An unexpected error occurred";
+      alert(`❌ Operation failed: ${errorMessage}`);
       console.error(err);
     } finally {
       setIsLoading(false);
@@ -362,7 +395,7 @@ export default function MasterUploadPage() {
       xhr.upload.addEventListener("load", () => {
         setIsProcessing(true);
       });
-      const response = await new Promise((resolve, reject) => {
+      const response: UploadResponse = await new Promise((resolve, reject) => {
         xhr.open("POST", "/api/replace-master-sheet");
         xhr.onload = () => {
           if (xhr.status >= 200 && xhr.status < 300) {
@@ -383,14 +416,15 @@ export default function MasterUploadPage() {
         alert(`⚠️ ${response.message}\n${errorMessage}\nCheck Operation Result for details on failed rows.`);
       } else {
         const message = `${response.message}${
-          response.failedRows.length > 0
-            ? `\nFirst error: ${response.firstError.error} (Row ${response.firstError.rowIndex}, Date: ${response.firstError.rawDate}, System Tag: ${response.firstError.rawSystemTag})\nCheck Operation Result for details on ${response.failedRows.length} failed rows.`
+          response.failedRows && response.failedRows.length > 0
+            ? `\nFirst error: ${response.firstError?.error} (Row ${response.firstError?.rowIndex}, Date: ${response.firstError?.rawDate}, System Tag: ${response.firstError?.rawSystemTag})\nCheck Operation Result for details on ${response.failedRows.length} failed rows.`
             : ""
         }`;
         alert(`✅ ${message}`);
       }
-    } catch (err: any) {
-      alert(`❌ Replacement failed: ${err.message}`);
+    } catch (err: unknown) {
+      const errorMessage = err instanceof Error ? err.message : "An unexpected error occurred";
+      alert(`❌ Replacement failed: ${errorMessage}`);
       console.error(err);
     } finally {
       setIsLoading(false);
@@ -416,10 +450,8 @@ export default function MasterUploadPage() {
             <Select
               options={accounts}
               placeholder="Choose account"
-              value={selectedQcode}
               onChange={(value) => setSelectedQcode(value)}
               className="w-full h-11 px-4 py-2.5 border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-brand-500/50"
-              disabled={isOperationInProgress}
             />
           </div>
 
@@ -428,32 +460,28 @@ export default function MasterUploadPage() {
             <DatePicker
               label="Start Date"
               placeholder="From"
-              value={filterStartDate ? new Date(filterStartDate) : null}
               onChange={(date) => {
                 if (date) {
-                  const formatted = new Date(date).toISOString().split("T")[0];
+                  const formatted = new Date(date[0]).toISOString().split("T")[0];
                   setFilterStartDate(formatted);
                 } else {
                   setFilterStartDate(null);
                 }
               }}
               id="filterStartDate"
-              disabled={isOperationInProgress}
             />
             <DatePicker
               label="End Date"
               placeholder="To"
-              value={filterEndDate ? new Date(filterEndDate) : null}
               onChange={(date) => {
                 if (date) {
-                  const formatted = new Date(date).toISOString().split("T")[0];
+                  const formatted = new Date(date[0]).toISOString().split("T")[0];
                   setFilterEndDate(formatted);
                 } else {
                   setFilterEndDate(null);
                 }
               }}
               id="filterEndDate"
-              disabled={isOperationInProgress}
             />
           </div>
 
@@ -517,7 +545,7 @@ export default function MasterUploadPage() {
             >
               {isDeleting && operationType === "delete" ? (
                 <>
-                  <Spinner className="h-5 w-5 mr-2 text-white" />
+                  <Spinner  />
                   Deleting...
                 </>
               ) : (
@@ -542,7 +570,7 @@ export default function MasterUploadPage() {
                 >
                   {isLoading && operationType === "upload" ? (
                     <>
-                      <Spinner className="h-5 w-5 mr-2 text-white" />
+                      <Spinner  />
                       {isProcessing ? "Processing..." : "Uploading..."}
                     </>
                   ) : (
@@ -560,7 +588,7 @@ export default function MasterUploadPage() {
                 >
                   {isLoading && operationType === "combined" ? (
                     <>
-                      <Spinner className="h-5 w-5 mr-2 text-white" />
+                      <Spinner  />
                       {isProcessing ? "Processing..." : "Uploading..."}
                     </>
                   ) : (
@@ -578,7 +606,7 @@ export default function MasterUploadPage() {
                 >
                   {isLoading && operationType === "replace" ? (
                     <>
-                      <Spinner className="h-5 w-5 mr-2 text-white" />
+                      <Spinner  />
                       {isProcessing ? "Processing..." : "Uploading..."}
                     </>
                   ) : (
@@ -617,33 +645,33 @@ export default function MasterUploadPage() {
           <div className="space-y-6">
             <div
               className={
-                operationResult.failedRows?.length > 0 || operationResult.message.includes("failed")
+                operationResult.failedRows && operationResult.failedRows.length > 0|| operationResult.message.includes("failed")
                   ? "p-4 border border-red-200 bg-red-50 dark:border-red-900 dark:bg-red-900/10 rounded-lg"
                   : "p-4 border border-green-200 bg-green-50 dark:border-green-900 dark:bg-green-900/10 rounded-lg"
               }
             >
               <h3
                 className={
-                  operationResult.failedRows?.length > 0 || operationResult.message.includes("failed")
+                  operationResult.failedRows && operationResult.failedRows.length > 0|| operationResult.message.includes("failed")
                     ? "font-semibold text-red-800 dark:text-red-300"
                     : "font-semibold text-green-800 dark:text-green-300"
                 }
               >
                 {operationResult.message}
               </h3>
-              {operationResult.deletedCount > 0 && (
+              {operationResult.deletedCount && operationResult.deletedCount > 0 && (
                 <p className="mt-1 text-sm text-gray-700 dark:text-gray-400">
                   Deleted {operationResult.deletedCount} existing rows.
                 </p>
               )}
-              {operationResult.failedRows?.length > 0 && (
+              {operationResult.failedRows && operationResult.failedRows.length > 0&& (
                 <p className="mt-1 text-sm text-red-700 dark:text-red-400">
                   Found {operationResult.failedRows.length} row(s) with errors. Below are details for the first{" "}
                   {Math.min(operationResult.failedRows.length, 5)} issues:
                 </p>
               )}
             </div>
-            {operationResult.failedRows?.length > 0 && (
+            {operationResult.failedRows && operationResult.failedRows.length > 0&& (
               <div className="overflow-x-auto">
                 <Table>
                   <TableHeader className="border-b border-gray-100 dark:border-gray-700">
@@ -669,7 +697,7 @@ export default function MasterUploadPage() {
                     </TableRow>
                   </TableHeader>
                   <TableBody className="divide-y divide-gray-100 dark:divide-gray-700">
-                    {operationResult.failedRows.slice(0, 5).map((row: any, index: number) => (
+                    {operationResult.failedRows.slice(0, 5).map((row, index) => (
                       <TableRow key={index}>
                         <TableCell className="px-5 py-4 text-sm text-gray-700 dark:text-white">
                           {row.rowIndex}
@@ -703,8 +731,8 @@ export default function MasterUploadPage() {
               <ul className="list-disc ml-5 mt-2 text-sm text-blue-700 dark:text-blue-400">
                 <li>Make sure your CSV has all required columns with exact spelling</li>
                 <li>Check that dates are in a valid format (YYYY-MM-DD recommended)</li>
-                <li>Ensure numeric values don’t contain invalid characters</li>
-                <li>Verify that "System Tag" column is not empty</li>
+                <li>Ensure numeric values don&quot;t contain invalid characters</li>
+                <li>Verify that &quot;System Tag&quot; column is not empty</li>
                 <li>Ensure CSV dates are within the selected date range if provided</li>
               </ul>
             </div>

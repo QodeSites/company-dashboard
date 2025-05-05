@@ -9,7 +9,7 @@ datasource db {
 
 model Account {
   id                         Int                          @id @default(autoincrement())
-  account_id                 String                       @unique
+  account_id                 String?                      @unique
   qcode                      String                       @unique
   account_name               String
   broker                     String
@@ -88,72 +88,6 @@ model AccountAccess {
   @@map("account_access")
 }
 
-/// The underlying table does not contain a valid unique identifier and can therefore currently not be handled by Prisma Client.
-model master_sheet_qac00001 {
-  id                   Int       @default(autoincrement())
-  qcode                String    @db.VarChar(20)
-  date                 DateTime  @db.Date
-  portfolio_value      Decimal?  @db.Decimal(20, 4)
-  capital_in_out       Decimal?  @db.Decimal(20, 4)
-  nav                  Decimal?  @db.Decimal(20, 4)
-  prev_nav             Decimal?  @db.Decimal(20, 4)
-  pnl                  Decimal?  @db.Decimal(20, 4)
-  daily_p_l            Decimal?  @db.Decimal(20, 4)
-  exposure_value       Decimal?  @db.Decimal(20, 4)
-  prev_portfolio_value Decimal?  @db.Decimal(20, 4)
-  prev_exposure_value  Decimal?  @db.Decimal(20, 4)
-  prev_pnl             Decimal?  @db.Decimal(20, 4)
-  drawdown             Decimal?  @db.Decimal(20, 4)
-  system_tag           String?   @db.VarChar(50)
-  created_at           DateTime? @default(now()) @db.Timestamp(6)
-
-  @@ignore
-}
-
-/// The underlying table does not contain a valid unique identifier and can therefore currently not be handled by Prisma Client.
-model master_sheet_qac00002 {
-  id                   Int       @default(autoincrement())
-  qcode                String    @db.VarChar(20)
-  date                 DateTime  @db.Date
-  portfolio_value      Decimal?  @db.Decimal(20, 4)
-  capital_in_out       Decimal?  @db.Decimal(20, 4)
-  nav                  Decimal?  @db.Decimal(20, 4)
-  prev_nav             Decimal?  @db.Decimal(20, 4)
-  pnl                  Decimal?  @db.Decimal(20, 4)
-  daily_p_l            Decimal?  @db.Decimal(20, 4)
-  exposure_value       Decimal?  @db.Decimal(20, 4)
-  prev_portfolio_value Decimal?  @db.Decimal(20, 4)
-  prev_exposure_value  Decimal?  @db.Decimal(20, 4)
-  prev_pnl             Decimal?  @db.Decimal(20, 4)
-  drawdown             Decimal?  @db.Decimal(20, 4)
-  system_tag           String?   @db.VarChar(50)
-  created_at           DateTime? @default(now()) @db.Timestamp(6)
-
-  @@ignore
-}
-
-/// The underlying table does not contain a valid unique identifier and can therefore currently not be handled by Prisma Client.
-model master_sheet_qac00003 {
-  id                   Int       @default(autoincrement())
-  qcode                String    @db.VarChar(20)
-  date                 DateTime  @db.Date
-  portfolio_value      Decimal?  @db.Decimal(20, 4)
-  capital_in_out       Decimal?  @db.Decimal(20, 4)
-  nav                  Decimal?  @db.Decimal(20, 4)
-  prev_nav             Decimal?  @db.Decimal(20, 4)
-  pnl                  Decimal?  @db.Decimal(20, 4)
-  daily_p_l            Decimal?  @db.Decimal(20, 4)
-  exposure_value       Decimal?  @db.Decimal(20, 4)
-  prev_portfolio_value Decimal?  @db.Decimal(20, 4)
-  prev_exposure_value  Decimal?  @db.Decimal(20, 4)
-  prev_pnl             Decimal?  @db.Decimal(20, 4)
-  drawdown             Decimal?  @db.Decimal(20, 4)
-  system_tag           String?   @db.VarChar(50)
-  created_at           DateTime? @default(now()) @db.Timestamp(6)
-
-  @@ignore
-}
-
 model pooled_account_allocations {
   id                  Int       @id @default(autoincrement())
   qcode               String?
@@ -166,4 +100,80 @@ model pooled_account_allocations {
   accounts            Account?  @relation(fields: [qcode], references: [qcode], onDelete: NoAction, onUpdate: NoAction)
 
   @@unique([qcode, icode, allocation_date])
+}
+
+model master_sheet_qac00011 {
+  id                   Int       @id @default(autoincrement())
+  qcode                String    @db.VarChar(20)
+  date                 DateTime  @db.Date
+  portfolio_value      Decimal?  @db.Decimal(20, 4)
+  capital_in_out       Decimal?  @db.Decimal(20, 4)
+  nav                  Decimal?  @db.Decimal(20, 4)
+  prev_nav             Decimal?  @db.Decimal(20, 4)
+  pnl                  Decimal?  @db.Decimal(20, 4)
+  daily_p_l            Decimal?  @db.Decimal(20, 4)
+  exposure_value       Decimal?  @db.Decimal(20, 4)
+  prev_portfolio_value Decimal?  @db.Decimal(20, 4)
+  prev_exposure_value  Decimal?  @db.Decimal(20, 4)
+  prev_pnl             Decimal?  @db.Decimal(20, 4)
+  drawdown             Decimal?  @db.Decimal(20, 4)
+  system_tag           String?   @db.VarChar(50)
+  created_at           DateTime? @default(now()) @db.Timestamp(6)
+}
+
+model master_sheet_qac00012 {
+  id                   Int       @id @default(autoincrement())
+  qcode                String    @db.VarChar(20)
+  date                 DateTime  @db.Date
+  portfolio_value      Decimal?  @db.Decimal(20, 4)
+  capital_in_out       Decimal?  @db.Decimal(20, 4)
+  nav                  Decimal?  @db.Decimal(20, 4)
+  prev_nav             Decimal?  @db.Decimal(20, 4)
+  pnl                  Decimal?  @db.Decimal(20, 4)
+  daily_p_l            Decimal?  @db.Decimal(20, 4)
+  exposure_value       Decimal?  @db.Decimal(20, 4)
+  prev_portfolio_value Decimal?  @db.Decimal(20, 4)
+  prev_exposure_value  Decimal?  @db.Decimal(20, 4)
+  prev_pnl             Decimal?  @db.Decimal(20, 4)
+  drawdown             Decimal?  @db.Decimal(20, 4)
+  system_tag           String?   @db.VarChar(50)
+  created_at           DateTime? @default(now()) @db.Timestamp(6)
+}
+
+model master_sheet_qac00013 {
+  id                   Int       @id @default(autoincrement())
+  qcode                String    @db.VarChar(20)
+  date                 DateTime  @db.Date
+  portfolio_value      Decimal?  @db.Decimal(20, 4)
+  capital_in_out       Decimal?  @db.Decimal(20, 4)
+  nav                  Decimal?  @db.Decimal(20, 4)
+  prev_nav             Decimal?  @db.Decimal(20, 4)
+  pnl                  Decimal?  @db.Decimal(20, 4)
+  daily_p_l            Decimal?  @db.Decimal(20, 4)
+  exposure_value       Decimal?  @db.Decimal(20, 4)
+  prev_portfolio_value Decimal?  @db.Decimal(20, 4)
+  prev_exposure_value  Decimal?  @db.Decimal(20, 4)
+  prev_pnl             Decimal?  @db.Decimal(20, 4)
+  drawdown             Decimal?  @db.Decimal(20, 4)
+  system_tag           String?   @db.VarChar(50)
+  created_at           DateTime? @default(now()) @db.Timestamp(6)
+}
+
+model master_sheet_qac00014 {
+  id                   Int       @id @default(autoincrement())
+  qcode                String    @db.VarChar(20)
+  date                 DateTime  @db.Date
+  portfolio_value      Decimal?  @db.Decimal(20, 4)
+  capital_in_out       Decimal?  @db.Decimal(20, 4)
+  nav                  Decimal?  @db.Decimal(20, 4)
+  prev_nav             Decimal?  @db.Decimal(20, 4)
+  pnl                  Decimal?  @db.Decimal(20, 4)
+  daily_p_l            Decimal?  @db.Decimal(20, 4)
+  exposure_value       Decimal?  @db.Decimal(20, 4)
+  prev_portfolio_value Decimal?  @db.Decimal(20, 4)
+  prev_exposure_value  Decimal?  @db.Decimal(20, 4)
+  prev_pnl             Decimal?  @db.Decimal(20, 4)
+  drawdown             Decimal?  @db.Decimal(20, 4)
+  system_tag           String?   @db.VarChar(50)
+  created_at           DateTime? @default(now()) @db.Timestamp(6)
 }

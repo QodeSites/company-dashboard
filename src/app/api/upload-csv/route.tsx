@@ -1,14 +1,16 @@
 import { NextRequest, NextResponse } from "next/server";
 import { parse } from "csv-parse/sync";
 import { PrismaClient } from "@prisma/client";
-import { Readable } from "stream";
 
 const prisma = new PrismaClient();
 
-async function streamToString(stream: Readable): Promise<string> {
+async function streamToString(stream: ReadableStream<Uint8Array>): Promise<string> {
+  const reader = stream.getReader();
   const chunks: Uint8Array[] = [];
-  for await (const chunk of stream) {
-    chunks.push(typeof chunk === "string" ? Buffer.from(chunk) : chunk);
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    chunks.push(value);
   }
   return Buffer.concat(chunks).toString("utf-8");
 }
@@ -46,13 +48,13 @@ export async function POST(req: NextRequest) {
 
   try {
     // Verify table existence
-    const tableExists = await prisma.$queryRawUnsafe(`
-      SELECT EXISTS (
+    const tableExists = await prisma.$queryRawUnsafe<{ exists: boolean }[]>(
+      `SELECT EXISTS (
         SELECT FROM information_schema.tables 
         WHERE table_schema = 'public' 
         AND table_name = '${tableName}'
-      )
-    `);
+      )`
+    );
 
     if (!tableExists[0].exists) {
       return NextResponse.json({ message: `Table ${tableName} does not exist` }, { status: 400 });
@@ -84,7 +86,7 @@ export async function POST(req: NextRequest) {
     console.log("CSV Columns:", columnNames);
 
     let successCount = 0;
-    let failedRows: { rowIndex: number; row: any; error: string }[] = [];
+    const failedRows: { rowIndex: number; row: Record<string, unknown>; error: string }[] = [];
 
     // Optional: Validate CSV dates are within the specified range
     if (startDate && endDate) {
@@ -96,7 +98,10 @@ export async function POST(req: NextRequest) {
         if (!rowDate || rowDate < start || rowDate > end) {
           failedRows.push({
             rowIndex: i + 1,
-            row,
+            row: Object.entries(row).reduce((acc: Record<string, unknown>, [key, value]) => {
+              acc[key] = typeof value === "string" && value.length > 50 ? value.substring(0, 50) + "..." : value;
+              return acc;
+            }, {}),
             error: `Date ${row["Date"]} is outside the specified range: ${startDate} to ${endDate}`,
           });
         }
@@ -123,9 +128,9 @@ export async function POST(req: NextRequest) {
           }
         }
 
-        const safeParseFloat = (value: any): number | null => {
+        const safeParseFloat = (value: unknown): number | null => {
           if (value === undefined || value === null || value === "") return null;
-          const parsed = parseFloat(value);
+          const parsed = parseFloat(value as string);
           return isNaN(parsed) ? null : parsed;
         };
 
@@ -195,14 +200,15 @@ export async function POST(req: NextRequest) {
         );
 
         successCount++;
-      } catch (err: any) {
+      } catch (err: unknown) {
+        const errorMessage = err instanceof Error ? err.message : "An unexpected error occurred";
         failedRows.push({
           rowIndex: i + 1,
-          row: Object.entries(row).reduce((acc, [key, value]) => {
+          row: Object.entries(row).reduce((acc: Record<string, unknown>, [key, value]) => {
             acc[key] = typeof value === "string" && value.length > 50 ? value.substring(0, 50) + "..." : value;
             return acc;
-          }, {} as Record<string, any>),
-          error: err.message || "Unknown error",
+          }, {}),
+          error: errorMessage,
         });
       }
     }
@@ -214,10 +220,13 @@ export async function POST(req: NextRequest) {
       firstError: failedRows.length ? failedRows[0] : null,
       failedRows: failedRows.length ? failedRows.slice(0, 10) : [],
     });
-  } catch (err: any) {
+  } catch (err: unknown) {
+    const errorMessage = err instanceof Error ? err.message : "An unexpected error occurred";
     console.error("CSV Upload Error:", err);
+    const errorDetails =
+      err instanceof Error && "code" in err && typeof err.code === "string" ? `Error Code: ${err.code}` : undefined;
     return NextResponse.json(
-      { message: "Upload failed", error: err.message, details: err?.code ? `Error Code: ${err.code}` : undefined },
+      { message: "Upload failed", error: errorMessage, details: errorDetails },
       { status: 500 }
     );
   } finally {

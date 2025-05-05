@@ -47,9 +47,11 @@ export default function UsersDashboard() {
 
         setUsers(usersData);
         setData(dashboardData);
-      } catch (err: any) {
+      } catch (err: unknown) {
+        const errorMessage = err instanceof Error ? err.message : 'An unexpected error occurred';
+
         console.error("Error fetching data:", err);
-        setError(err.message || "An error occurred while loading data");
+        setError(errorMessage || "An error occurred while loading data");
       } finally {
         setIsLoading(false);
       }
@@ -184,7 +186,6 @@ export default function UsersDashboard() {
                   ) : (
                     <TableRow>
                       <TableCell
-                        colSpan={4}
                         className="px-5 py-4 text-center text-theme-sm text-gray-700 dark:text-white/90"
                       >
                         No users found.

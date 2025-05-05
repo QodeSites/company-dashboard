@@ -123,8 +123,15 @@ export async function POST(req: NextRequest) {
       `);
 
       // Handle user allocations for all account types
+      interface UserAllocation {
+        amount?: string | number;
+        icode: string;
+        date: string;
+        access_level: string;
+      }
+
       const totalAmount = user_allocations.reduce(
-        (sum: number, u: any) => sum + parseFloat(u.amount || 0),
+        (sum: number, u: UserAllocation) => sum + parseFloat(u.amount?.toString() || '0'),
         0
       );
 
@@ -183,9 +190,11 @@ export async function POST(req: NextRequest) {
     });
 
     return NextResponse.json({ message: 'Account created with master sheet and allocations!', account: result });
-  } catch (error: any) {
-    console.error('POST /api/accounts error:', error);
-    return NextResponse.json({ message: `❌ Error creating account: ${error.message}` }, { status: 500 });
+  } catch (error: unknown) {
+    const errorMessage = error instanceof Error ? error.message : 'An unexpected error occurred';
+
+    console.error('POST /api/accounts error:', errorMessage);
+    return NextResponse.json({ message: `❌ Error creating account: ${errorMessage}` }, { status: 500 });
   }
 }
 
@@ -270,10 +279,12 @@ export async function DELETE(req: NextRequest) {
     });
 
     return NextResponse.json({ message: `Account ${qcode} deleted successfully` });
-  } catch (error: any) {
-    console.error('DELETE /api/accounts error:', error);
+  } catch (error: unknown) {
+    const errorMessage = error instanceof Error ? error.message : 'An unexpected error occurred';
+
+    console.error('DELETE /api/accounts error:', errorMessage);
     return NextResponse.json(
-      { message: `❌ Error deleting account: ${error.message}` },
+      { message: `❌ Error deleting account: ${errorMessage}` },
       { status: 500 }
     );
   }

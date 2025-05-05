@@ -1,12 +1,15 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { parse } from 'csv-parse/sync';
 import { prisma } from '@/lib/prisma';
-import { Readable } from 'stream';
-
-async function streamToString(stream: Readable): Promise<string> {
+import { safeParseFloat } from '@/utils/safeParseFloat';
+// Convert ReadableStream to string
+async function streamToString(stream: ReadableStream<Uint8Array>): Promise<string> {
+  const reader = stream.getReader();
   const chunks: Uint8Array[] = [];
-  for await (const chunk of stream) {
-    chunks.push(typeof chunk === 'string' ? Buffer.from(chunk) : chunk);
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    chunks.push(value);
   }
   return Buffer.concat(chunks).toString('utf-8');
 }
@@ -48,13 +51,13 @@ export async function POST(req: NextRequest) {
     const tableName = `master_sheet_${qcode}`;
 
     // Verify table existence
-    const tableExists = await prisma.$queryRawUnsafe(`
-      SELECT EXISTS (
+    const tableExists = await prisma.$queryRawUnsafe<{ exists: boolean }[]>(
+      `SELECT EXISTS (
         SELECT FROM information_schema.tables 
         WHERE table_schema = 'public' 
         AND table_name = '${tableName}'
-      )
-    `);
+      )`
+    );
 
     if (!tableExists[0].exists) {
       return NextResponse.json({ message: `Table ${tableName} does not exist` }, { status: 400 });
@@ -97,7 +100,7 @@ export async function POST(req: NextRequest) {
     }
 
     let successCount = 0;
-    let failedRows: { rowIndex: number; row: any; error: string }[] = [];
+    const failedRows: { rowIndex: number; row: Record<string, unknown>; error: string }[] = [];
 
     // Truncate the table in a short transaction
     await prisma.$transaction(
@@ -111,14 +114,14 @@ export async function POST(req: NextRequest) {
     );
 
     // Process and insert rows in batches outside a transaction
-    const batchSize = 500; // Smaller batch size for bulk inserts
+    const batchSize = 500;
     for (let i = 0; i < records.length; i += batchSize) {
       const batch = records.slice(i, i + batchSize);
       const batchStart = Date.now();
       console.log(`Processing batch ${i / batchSize + 1} (${batch.length} rows)`);
 
       // Prepare values for bulk insert
-      const values: any[] = [];
+      const values: unknown[] = [];
       const placeholders: string[] = [];
 
       for (const [index, row] of batch.entries()) {
@@ -131,9 +134,9 @@ export async function POST(req: NextRequest) {
             }
           }
 
-          const safeParseFloat = (value: any): number | null => {
+          const safeParseFloat = (value: unknown): number | null => {
             if (value === undefined || value === null || value === '') return null;
-            const parsed = parseFloat(value);
+            const parsed = parseFloat(value as string);
             return isNaN(parsed) ? null : parsed;
           };
 
@@ -171,14 +174,15 @@ export async function POST(req: NextRequest) {
           // Add values and placeholder for bulk insert
           values.push(...rowValues);
           placeholders.push(`($${values.length - 13 + 1}, $${values.length - 12 + 1}, $${values.length - 11 + 1}, $${values.length - 10 + 1}, $${values.length - 9 + 1}, $${values.length - 8 + 1}, $${values.length - 7 + 1}, $${values.length - 6 + 1}, $${values.length - 5 + 1}, $${values.length - 4 + 1}, $${values.length - 3 + 1}, $${values.length - 2 + 1}, $${values.length - 1 + 1}, $${values.length})`);
-        } catch (err: any) {
+        } catch (err: unknown) {
+          const errorMessage = err instanceof Error ? err.message : 'Unknown error';
           failedRows.push({
             rowIndex: i + index + 1,
-            row: Object.entries(row).reduce((acc, [key, value]) => {
+            row: Object.entries(row).reduce((acc: Record<string, unknown>, [key, value]) => {
               acc[key] = typeof value === 'string' && value.length > 50 ? value.substring(0, 50) + '...' : value;
               return acc;
-            }, {} as Record<string, any>),
-            error: err.message || 'Unknown error',
+            }, {}),
+            error: errorMessage,
           });
         }
       }
@@ -194,24 +198,24 @@ export async function POST(req: NextRequest) {
           `;
           await prisma.$executeRawUnsafe(insertQuery, ...values);
           successCount += placeholders.length;
-        } catch (err: any) {
-          // If bulk insert fails, fall back to individual inserts for better error isolation
+        } catch {
+          // If bulk insert fails, fall back to individual inserts
           for (const [index, row] of batch.entries()) {
             try {
               const rowValues = [
                 qcode,
                 row['Date'] ? new Date(row['Date']) : null,
-                parseFloat(row['Portfolio Value']),
-                parseFloat(row['Cash In/Out']),
-                parseFloat(row['NAV']),
-                parseFloat(row['Prev NAV']),
-                parseFloat(row['PnL']),
-                parseFloat(row['Daily P/L %']),
-                parseFloat(row['Exposure Value']),
-                parseFloat(row['Prev Portfolio Value']),
-                parseFloat(row['Prev Exposure Value']),
-                parseFloat(row['Prev Pnl']),
-                parseFloat(row['Drawdown %']),
+                safeParseFloat(row['Portfolio Value']),
+                safeParseFloat(row['Cash In/Out']),
+                safeParseFloat(row['NAV']),
+                safeParseFloat(row['Prev NAV']),
+                safeParseFloat(row['PnL']),
+                safeParseFloat(row['Daily P/L %']),
+                safeParseFloat(row['Exposure Value']),
+                safeParseFloat(row['Prev Portfolio Value']),
+                safeParseFloat(row['Prev Exposure Value']),
+                safeParseFloat(row['Prev Pnl']),
+                safeParseFloat(row['Drawdown %']),
                 row['System Tag'] || null,
               ];
 
@@ -228,14 +232,15 @@ export async function POST(req: NextRequest) {
                 ...rowValues
               );
               successCount++;
-            } catch (err: any) {
+            } catch (err: unknown) {
+              const errorMessage = err instanceof Error ? err.message : 'Unknown error';
               failedRows.push({
                 rowIndex: i + index + 1,
-                row: Object.entries(row).reduce((acc, [key, value]) => {
+                row: Object.entries(row).reduce((acc: Record<string, unknown>, [key, value]) => {
                   acc[key] = typeof value === 'string' && value.length > 50 ? value.substring(0, 50) + '...' : value;
                   return acc;
-                }, {} as Record<string, any>),
-                error: err.message || 'Unknown error',
+                }, {}),
+                error: errorMessage,
               });
             }
           }
@@ -248,8 +253,9 @@ export async function POST(req: NextRequest) {
     const totalDuration = Date.now() - startTime;
     console.log('Total Operation Duration:', totalDuration, 'ms');
 
-    const message = `Master sheet replaced successfully. Inserted ${successCount} rows. ${failedRows.length > 0 ? `${failedRows.length} rows failed to insert.` : ''
-      }`;
+    const message = `Master sheet replaced successfully. Inserted ${successCount} rows. ${
+      failedRows.length > 0 ? `${failedRows.length} rows failed to insert.` : ''
+    }`;
 
     return NextResponse.json({
       message,
@@ -259,10 +265,11 @@ export async function POST(req: NextRequest) {
       firstError: failedRows.length ? failedRows[0] : null,
       failedRows: failedRows.length ? failedRows.slice(0, 10) : [],
     });
-  } catch (error: any) {
+  } catch (error: unknown) {
+    const errorMessage = error instanceof Error ? error.message : 'An unexpected error occurred';
     console.error('POST /api/replace-master-sheet error:', error);
     return NextResponse.json(
-      { message: `❌ Error replacing master sheet: ${error.message}` },
+      { message: `❌ Error replacing master sheet: ${errorMessage}` },
       { status: 500 }
     );
   } finally {
