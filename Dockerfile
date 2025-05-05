@@ -23,8 +23,10 @@ WORKDIR /app
 # Create non-root user and group
 RUN addgroup -g 1001 -S nodejs && adduser -S nextjs -u 1001
 
-# Set ownership of /app to nextjs user before copying files
-RUN chown nextjs:nodejs /app
+# Set ownership of /app and npm cache directory as root
+RUN chown nextjs:nodejs /app && \
+    mkdir -p /home/nextjs/.npm && \
+    chown nextjs:nodejs /home/nextjs/.npm
 
 # Copy only necessary files from builder with correct ownership
 COPY --from=builder --chown=nextjs:nodejs /app/.next ./.next
@@ -35,9 +37,6 @@ COPY --from=builder --chown=nextjs:nodejs /app/package-lock.json ./package-lock.
 
 # Switch to non-root user
 USER nextjs
-
-# Set npm cache directory and ensure permissions
-RUN mkdir -p /home/nextjs/.npm && chown nextjs:nodejs /home/nextjs/.npm
 
 # Install only production dependencies
 RUN npm ci --omit=dev
