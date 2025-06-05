@@ -84,7 +84,6 @@ yarn-error.log*
 
 # ── Docker / build artifacts ─────────────────────────────────────────────────
 # (If you generate images/manifests or have local Docker build files.)
-Dockerfile
 docker-compose.override.yml
 docker-compose.local.yml
 *.tar
