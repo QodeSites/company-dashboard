@@ -7,6 +7,8 @@ services:
       args:
         DATABASE_URL: ${DATABASE_URL}
     restart: always
+    env_file:
+      - .env
     environment:
       - PORT=8000
       - DATABASE_URL=${DATABASE_URL}
@@ -22,6 +24,8 @@ services:
       args:
         DATABASE_URL: ${DATABASE_URL}
     restart: always
+    env_file:
+      - .env
     environment:
       - NODE_ENV=production
       - PORT=3002
