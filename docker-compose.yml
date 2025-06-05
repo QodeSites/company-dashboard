@@ -12,6 +12,8 @@ services:
       - DATABASE_URL=${DATABASE_URL}
     networks:
       - webnet
+    PORTS:
+      - "8010:8000"
 
   frontend:
     build:
@@ -31,7 +33,7 @@ services:
 
     # ← Add a ports section with only the container port:
     ports:
-      - "3002"
+      - "3020:3002"
 
 networks:
   webnet:
