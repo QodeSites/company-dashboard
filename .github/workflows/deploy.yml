@@ -23,42 +23,79 @@ jobs:
       - name: Set up SSH key for VPS
         run: |
           mkdir -p ~/.ssh
+          chmod 700 ~/.ssh
           echo "${{ secrets.VPS_SSH_KEY }}" > ~/.ssh/id_rsa
           chmod 600 ~/.ssh/id_rsa
+          
+          # Add known host (replace with your actual host fingerprint)
+          # ssh-keyscan -p ${{ secrets.VPS_PORT || '22' }} ${{ secrets.VPS_HOST }} >> ~/.ssh/known_hosts
+          
+          # Temporary fallback - consider adding proper host key verification
           printf "Host *\n    StrictHostKeyChecking no\n    UserKnownHostsFile=/dev/null\n" > ~/.ssh/config
+        shell: bash
+
+      - name: Validate required secrets
+        run: |
+          if [ -z "${{ secrets.VPS_HOST }}" ] || [ -z "${{ secrets.VPS_USER }}" ] || [ -z "${{ secrets.TARGET_DIR }}" ]; then
+            echo "Error: Missing required secrets (VPS_HOST, VPS_USER, TARGET_DIR)"
+            exit 1
+          fi
         shell: bash
 
       - name: Rsync repository to VPS
         run: |
+          set -e
+          VPS_PORT="${{ secrets.VPS_PORT }}"
+          VPS_PORT="${VPS_PORT:-22}"
+          
           rsync -avz --delete \
-            -e "ssh -i ~/.ssh/id_rsa -o StrictHostKeyChecking=no -p ${{ secrets.VPS_PORT || 22 }}" \
+            -e "ssh -i ~/.ssh/id_rsa -o StrictHostKeyChecking=no -p ${VPS_PORT}" \
+            --exclude '.git' \
+            --exclude '.github' \
+            --exclude 'node_modules' \
+            --exclude '.env*' \
             ./ \
             ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }}:${{ secrets.TARGET_DIR }}
         shell: bash
 
       - name: SSH → Build & restart Docker Compose
         run: |
-ssh -i ~/.ssh/id_rsa -p ${{ secrets.VPS_PORT || 22 }} ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }} << 'EOF'
-set -e
+          set -e
+          VPS_PORT="${{ secrets.VPS_PORT }}"
+          VPS_PORT="${VPS_PORT:-22}"
+          
+          ssh -i ~/.ssh/id_rsa -p ${VPS_PORT} ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }} << 'EOF'
+          set -e
 
-cd ${{ secrets.TARGET_DIR }}
+          cd ${{ secrets.TARGET_DIR }}
 
-# If you installed Docker Compose as a plugin, you can use `docker compose`; 
-# otherwise (or to be safe), use the old `docker-compose` binary.
-# Check which one exists on your VPS. For example:
-if command -v docker-compose > /dev/null 2>&1; then
-  COMPOSE_CMD="docker-compose"
-else
-  COMPOSE_CMD="docker compose"
-fi
+          # Decide whether to use `docker-compose` or `docker compose`
+          if command -v docker-compose > /dev/null 2>&1; then
+            COMPOSE_CMD="docker-compose"
+          elif docker compose version > /dev/null 2>&1; then
+            COMPOSE_CMD="docker compose"
+          else
+            echo "Error: Neither docker-compose nor docker compose is available"
+            exit 1
+          fi
 
-# Rebuild & restart both services:
-$COMPOSE_CMD pull    # updates base images (node:20, python:3.11)
-$COMPOSE_CMD build
-$COMPOSE_CMD up -d
+          echo "Using compose command: $COMPOSE_CMD"
 
-# Clean up dangling images
-docker image prune -f
+          # Pull, build, and restart with better error handling
+          $COMPOSE_CMD pull || echo "Warning: Failed to pull some images"
+          $COMPOSE_CMD build
+          $COMPOSE_CMD up -d
 
+          # Clean up dangling images and containers
+          docker image prune -f
+          docker container prune -f
+
+          echo "Deployment completed successfully"
 EOF
+        shell: bash
+
+      - name: Cleanup SSH key
+        if: always()
+        run: |
+          rm -f ~/.ssh/id_rsa
         shell: bash
