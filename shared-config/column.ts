@@ -1,0 +1,115 @@
+// /shared-configs/columns.ts
+
+export interface TableColumn {
+  displayName: string;
+  fieldName: string;
+  aliases?: string[];
+}
+
+export interface TableDefinition {
+  requiredColumns: TableColumn[];
+  dateField: string;
+  displayName: string;
+}
+
+export const sharedTableConfigs: Record<string, TableDefinition> = {
+  master_sheet: {
+    displayName: "Master Sheet",
+    dateField: "date",
+    requiredColumns: [
+      { displayName: "Date", fieldName: "date" },
+      { displayName: "Portfolio Value", fieldName: "portfolio_value" },
+      { displayName: "Cash In/Out", fieldName: "capital_in_out" },
+      { displayName: "NAV", fieldName: "nav" },
+      { displayName: "Prev NAV", fieldName: "prev_nav" },
+      { displayName: "PnL", fieldName: "pnl" },
+      { displayName: "Daily P/L %", fieldName: "daily_p_l" },
+      { displayName: "Exposure Value", fieldName: "exposure_value" },
+      { displayName: "Prev Portfolio Value", fieldName: "prev_portfolio_value" },
+      { displayName: "Prev Exposure Value", fieldName: "prev_exposure_value" },
+      { displayName: "Prev Pnl", fieldName: "prev_pnl" },
+      { displayName: "Drawdown %", fieldName: "drawdown" },
+      { displayName: "System Tag", fieldName: "system_tag" },
+    ],
+  },
+  tradebook: {
+    displayName: "Tradebook",
+    dateField: "timestamp_entry",
+    requiredColumns: [
+      { displayName: "Timestamp Entry", fieldName: "timestamp_entry" },
+      { displayName: "System Tag Entry", fieldName: "system_tag_entry" },
+      { displayName: "Action Entry", fieldName: "action_entry" },
+      { displayName: "Symbol Entry", fieldName: "symbol_entry" },
+      { displayName: "Price Entry", fieldName: "price_entry" },
+      { displayName: "Qty Entry", fieldName: "qty_entry" },
+      { displayName: "Contract Value Entry", fieldName: "contract_value_entry" },
+      { displayName: "Timestamp Exit", fieldName: "timestamp_exit" },
+      { displayName: "System Tag Exit", fieldName: "system_tag_exit" },
+      { displayName: "Action Exit", fieldName: "action_exit" },
+      { displayName: "Symbol Exit", fieldName: "symbol_exit" },
+      { displayName: "Price Exit", fieldName: "price_exit" },
+      { displayName: "Qty Exit", fieldName: "qty_exit" },
+      { displayName: "Contract Value Exit", fieldName: "contract_value_exit" },
+      { displayName: "Pnl Amount", fieldName: "pnl_amount", aliases: ["PNL Amount"] },
+      { displayName: "Pnl Amount Settlement", fieldName: "pnl_amount_settlement" },
+    ],
+  },
+  slippage: {
+    displayName: "Slippage",
+    dateField: "date",
+    requiredColumns: [
+      { displayName: "Date", fieldName: "date" },
+      { displayName: "Account", fieldName: "account" },
+      { displayName: "System Tag", fieldName: "system_tag" },
+      { displayName: "Capital In/Out", fieldName: "capital_in_out" },
+    ],
+  },
+  mutual_fund_holding: {
+    displayName: "Mutual Fund Holding",
+    dateField: "date",
+    requiredColumns: [
+      { displayName: "Date", fieldName: "date" },
+      { displayName: "Trade Type", fieldName: "trade_type" },
+      { displayName: "Symbol", fieldName: "symbol" },
+      { displayName: "ISIN", fieldName: "isin" },
+      { displayName: "Quantity", fieldName: "quantity" },
+      { displayName: "Price", fieldName: "price" },
+      { displayName: "Broker", fieldName: "broker" },
+      { displayName: "Debt Equity", fieldName: "debt_equity" },
+      { displayName: "Collateral", fieldName: "collateral" },
+      { displayName: "Sub Category", fieldName: "sub_category" },
+    ],
+  },
+  gold_tradebook: {
+    displayName: "Gold Tradebook",
+    dateField: "date",
+    requiredColumns: [
+      { displayName: "Date", fieldName: "date" },
+      { displayName: "Trade Type", fieldName: "trade_type" },
+      { displayName: "Symbol", fieldName: "symbol" },
+      { displayName: "Expiry", fieldName: "expiry" },
+      { displayName: "Exchange", fieldName: "exchange" },
+      { displayName: "Quantity", fieldName: "quantity" },
+      { displayName: "Lotsize", fieldName: "lotsize" },
+      { displayName: "No of Lots", fieldName: "no_of_lots" },
+      { displayName: "Price", fieldName: "price" },
+      { displayName: "Exposure", fieldName: "exposure" },
+    ],
+  },
+  liquidbees_tradebook: {
+    displayName: "Liquidbees Tradebook",
+    dateField: "date",
+    requiredColumns: [
+      { displayName: "Date", fieldName: "date" },
+      { displayName: "Trade Type", fieldName: "trade_type" },
+      { displayName: "Symbol", fieldName: "symbol" },
+      { displayName: "Exchange", fieldName: "exchange" },
+      { displayName: "Quantity", fieldName: "quantity" },
+      { displayName: "Price", fieldName: "price" },
+      { displayName: "Broker", fieldName: "broker" },
+      { displayName: "Debt Equity", fieldName: "debt_equity" },
+      { displayName: "Collateral", fieldName: "collateral" },
+      { displayName: "Sub Category", fieldName: "sub_category" },
+    ],
+  },
+};

@@ -1,0 +1,56 @@
+name: CI/CD - Deploy to VPS
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  deploy:
+    name: Build & Deploy to VPS
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check out code
+        uses: actions/checkout@v4
+
+      - name: Install rsync & ssh-client
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y rsync openssh-client
+        shell: bash
+
+      - name: Set up SSH key for VPS
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.VPS_SSH_KEY }}" > ~/.ssh/id_rsa
+          chmod 600 ~/.ssh/id_rsa
+          printf "Host *\n    StrictHostKeyChecking no\n    UserKnownHostsFile=/dev/null\n" > ~/.ssh/config
+        shell: bash
+
+      - name: Rsync repository to VPS
+        run: |
+          rsync -avz --delete \
+            -e "ssh -i ~/.ssh/id_rsa -o StrictHostKeyChecking=no -p ${{ secrets.VPS_PORT || 22 }}" \
+            ./ \
+            ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }}:${{ secrets.TARGET_DIR }}
+        shell: bash
+
+      - name: SSH → Build & restart Docker Compose
+        run: |
+          ssh -i ~/.ssh/id_rsa -p ${{ secrets.VPS_PORT || 22 }} \
+            ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }} << 'EOF'
+            set -e
+
+            cd ${{ secrets.TARGET_DIR }}
+
+            # Rebuild our backend & frontend images
+            docker compose pull    # updates base images (node:20, python:3.11)
+            docker compose build
+            docker compose up -d
+
+            # Clean up dangling images
+            docker image prune -f
+
+            EOF
+        shell: bash

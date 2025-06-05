@@ -1,0 +1,37 @@
+version: "3.8"
+
+services:
+  backend:
+    build:
+      context: ./backend
+      args:
+        DATABASE_URL: ${DATABASE_URL}
+    restart: always
+    environment:
+      - PORT=8000
+      - DATABASE_URL=${DATABASE_URL}
+    networks:
+      - webnet
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: ./frontend/Dockerfile
+      args:
+        DATABASE_URL: ${DATABASE_URL}
+    restart: always
+    environment:
+      - NODE_ENV=production
+      - PORT=3002
+      - NEXT_PUBLIC_API_BASE_URL=http://backend:8000/api
+    depends_on:
+      - backend
+    networks:
+      - webnet
+
+    # ← Add a ports section with only the container port:
+    ports:
+      - "3002"
+
+networks:
+  webnet:
