@@ -31,7 +31,7 @@ COPY . .
 
 # If you use Prisma migrations at runtime, generate the client & run migrations:
 RUN pip install --no-cache-dir prisma-client   # (if you need a Python Prisma runtime)
-RUN npx prisma generate                        # (if you run migrations at build time)
+RUN prisma generate                        # (if you run migrations at build time)
 # If you need to run migrations on container startup, you can do it in your CMD below
 
 #######################################################################
