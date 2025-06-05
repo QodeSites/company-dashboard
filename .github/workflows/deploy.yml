@@ -38,19 +38,27 @@ jobs:
 
       - name: SSH → Build & restart Docker Compose
         run: |
-          ssh -i ~/.ssh/id_rsa -p ${{ secrets.VPS_PORT || 22 }} \
-            ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }} << 'EOF'
-            set -e
+ssh -i ~/.ssh/id_rsa -p ${{ secrets.VPS_PORT || 22 }} ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }} << 'EOF'
+set -e
 
-            cd ${{ secrets.TARGET_DIR }}
+cd ${{ secrets.TARGET_DIR }}
 
-            # Rebuild our backend & frontend images
-            docker compose pull    # updates base images (node:20, python:3.11)
-            docker compose build
-            docker compose up -d
+# If you installed Docker Compose as a plugin, you can use `docker compose`; 
+# otherwise (or to be safe), use the old `docker-compose` binary.
+# Check which one exists on your VPS. For example:
+if command -v docker-compose > /dev/null 2>&1; then
+  COMPOSE_CMD="docker-compose"
+else
+  COMPOSE_CMD="docker compose"
+fi
 
-            # Clean up dangling images
-            docker image prune -f
+# Rebuild & restart both services:
+$COMPOSE_CMD pull    # updates base images (node:20, python:3.11)
+$COMPOSE_CMD build
+$COMPOSE_CMD up -d
 
-            EOF
+# Clean up dangling images
+docker image prune -f
+
+EOF
         shell: bash
