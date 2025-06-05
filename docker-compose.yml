@@ -16,7 +16,7 @@ services:
   frontend:
     build:
       context: ./frontend
-      dockerfile: ./frontend/Dockerfile
+      dockerfile: Dockerfile
       args:
         DATABASE_URL: ${DATABASE_URL}
     restart: always
