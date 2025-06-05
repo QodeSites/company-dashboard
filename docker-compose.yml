@@ -12,7 +12,7 @@ services:
       - DATABASE_URL=${DATABASE_URL}
     networks:
       - webnet
-    PORTS:
+    ports:
       - "8010:8000"
 
   frontend:
