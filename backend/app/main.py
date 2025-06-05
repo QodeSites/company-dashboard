@@ -1,7 +1,7 @@
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
-from routers.upload import router as upload_router
+from app.routers.upload import router as upload_router
 from routers.consolidated import router as consolidated_router
 from dotenv import load_dotenv
 import os
