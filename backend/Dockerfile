@@ -21,7 +21,6 @@ RUN pip install --no-cache-dir -r requirements.txt
 # Copy the rest of your backend code
 COPY . .
 
-COPY ../shared-config ./app/config
 
 # Generate the Prisma client (requires prisma in requirements.txt)
 RUN prisma generate
