@@ -4,7 +4,7 @@ from typing import List, Dict, Any, Optional
 from datetime import datetime
 import re
 import logging
-from config.constants import TABLE_COLUMNS, COLUMN_ALIASES, SHARED_TABLE_CONFIGS
+from app.config.constants import TABLE_COLUMNS, COLUMN_ALIASES, SHARED_TABLE_CONFIGS
 from decimal import Decimal, InvalidOperation
 
 logger = logging.getLogger(__name__)
