@@ -1,8 +1,8 @@
 from fastapi import APIRouter, UploadFile, File, Form, Depends, HTTPException
 from prisma import Prisma
 from prisma.errors import PrismaError
-from services.csv_processor import process_csv
-from services.db_operations import insert_data, delete_data, replace_data
+from app.services.csv_processor import process_csv
+from app.services.db_operations import insert_data, delete_data, replace_data
 from config.database import get_db
 import logging
 import re
