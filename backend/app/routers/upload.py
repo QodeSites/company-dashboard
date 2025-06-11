@@ -3,7 +3,7 @@ from prisma import Prisma
 from prisma.errors import PrismaError
 from app.services.csv_processor import process_csv
 from app.services.db_operations import insert_data, delete_data, replace_data
-from config.database import get_db
+from app.config.database import get_db
 import logging
 import re
 from typing import Optional, Dict, Any
@@ -11,7 +11,7 @@ from datetime import datetime
 import traceback
 from python_multipart.exceptions import MultipartParseError
 import time
-from config.constants import TABLE_COLUMNS
+from app.config.constants import TABLE_COLUMNS
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/api", tags=["upload"])

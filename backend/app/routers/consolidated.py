@@ -1,7 +1,7 @@
 
 from fastapi import APIRouter, UploadFile, File, HTTPException, BackgroundTasks
 from fastapi.responses import StreamingResponse
-from services.consolidated_processor import process_and_consolidate_csv
+from app.services.consolidated_processor import process_and_consolidate_csv
 import logging
 import traceback
 from python_multipart.exceptions import MultipartParseError

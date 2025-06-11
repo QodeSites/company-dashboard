@@ -2,11 +2,17 @@ from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from app.routers.upload import router as upload_router
-from routers.consolidated import router as consolidated_router
+from app.routers.consolidated import router as consolidated_router
 from dotenv import load_dotenv
+# from app.routers.pms_master_sheet import router as master_sheet_router
 import os
 import logging
 import traceback
+from pathlib import Path
+
+# Create logs directory if it doesn't exist
+logs_dir = Path("logs")
+logs_dir.mkdir(exist_ok=True)
 
 # Configure logging
 logging.basicConfig(
@@ -17,6 +23,15 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 load_dotenv("../.env")
+
+# Dependency for Prisma
+# async def get_db():
+#     db = Prisma()
+#     await db.connect()
+#     try:
+#         yield db
+#     finally:
+#         await db.disconnect()
 
 app = FastAPI(
     title="Portfolio API",
@@ -34,6 +49,7 @@ app.add_middleware(
 
 app.include_router(upload_router)
 app.include_router(consolidated_router)
+# app.include_router(master_sheet_router, dependencies=[Depends(get_db)])
 
 @app.get("/")
 async def root():

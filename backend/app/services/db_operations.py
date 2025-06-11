@@ -1,5 +1,5 @@
 from prisma import Prisma
-from models.schemas import MasterSheet
+from app.models.schemas import MasterSheet
 import logging
 from typing import List, Dict, Any, Tuple
 from prisma.errors import PrismaError
