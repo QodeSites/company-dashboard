@@ -3,8 +3,13 @@ FROM node:20-alpine AS builder
 
 WORKDIR /app
 
+# Update npm to recommended version
+RUN npm install -g npm@11.4.1
+
 # Install dependencies early (for caching)
 COPY package.json package-lock.json ./
+# Clear npm cache to avoid corruption
+RUN npm cache clean --force
 RUN npm ci
 
 # Copy Prisma schema and generate client
@@ -20,13 +25,16 @@ FROM node:20-alpine AS runner
 
 WORKDIR /app
 
+# Update npm in runner stage
+RUN npm install -g npm@11.4.1
+
 # Create non-root user and group
 RUN addgroup -g 1001 -S nodejs && adduser -S nextjs -u 1001
 
-# Set ownership of /app and npm cache directory as root
-RUN chown nextjs:nodejs /app && \
+# Set ownership of /app and npm cache directory
+RUN chown -R nextjs:nodejs /app && \
     mkdir -p /home/nextjs/.npm && \
-    chown nextjs:nodejs /home/nextjs/.npm
+    chown -R nextjs:nodejs /home/nextjs/.npm
 
 # Copy only necessary files from builder with correct ownership
 COPY --from=builder --chown=nextjs:nodejs /app/.next ./.next
@@ -39,7 +47,8 @@ COPY --from=builder --chown=nextjs:nodejs /app/package-lock.json ./package-lock.
 USER nextjs
 
 # Install only production dependencies
-RUN npm ci --omit=dev
+RUN npm cache clean --force
+RUN npm ci --omit=dev --loglevel=verbose
 
 # Generate Prisma client for Alpine compatibility
 RUN npx prisma generate
