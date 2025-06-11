@@ -3,14 +3,17 @@ FROM node:20-alpine AS builder
 
 WORKDIR /app
 
-# Update npm to recommended version
-RUN npm install -g npm@11.4.1
+# Update npm to recommended version and clear any existing cache
+RUN npm install -g npm@11.4.1 && \
+    npm cache clean --force && \
+    rm -rf /root/.npm/_cacache
 
 # Install dependencies early (for caching)
 COPY package.json package-lock.json ./
-# Clear npm cache to avoid corruption
-RUN npm cache clean --force
-RUN npm ci
+
+# Install with reduced parallelism and memory usage to avoid space issues
+RUN npm ci --maxsockets=1 --prefer-offline --no-audit --no-fund && \
+    npm cache clean --force
 
 # Copy Prisma schema and generate client
 COPY prisma ./prisma
@@ -18,7 +21,11 @@ RUN npx prisma generate
 
 # Copy rest of the app and build it
 COPY . .
-RUN npm run build
+RUN npm run build && \
+    # Clean up build artifacts and cache to save space
+    npm cache clean --force && \
+    rm -rf /root/.npm/_cacache && \
+    rm -rf node_modules/.cache
 
 # Stage 2: Run app with production settings
 FROM node:20-alpine AS runner
@@ -46,9 +53,10 @@ COPY --from=builder --chown=nextjs:nodejs /app/package-lock.json ./package-lock.
 # Switch to non-root user
 USER nextjs
 
-# Install only production dependencies
-RUN npm cache clean --force
-RUN npm ci --omit=dev --loglevel=verbose
+# Install only production dependencies with space-saving options
+RUN npm cache clean --force && \
+    npm ci --omit=dev --maxsockets=1 --prefer-offline --no-audit --no-fund && \
+    npm cache clean --force
 
 # Generate Prisma client for Alpine compatibility
 RUN npx prisma generate
