@@ -3,29 +3,31 @@ FROM node:20-alpine AS builder
 
 WORKDIR /app
 
-# Update npm to recommended version and clear any existing cache
+# Update npm to recommended version and configure for minimal space usage
 RUN npm install -g npm@11.4.1 && \
-    npm cache clean --force && \
-    rm -rf /root/.npm/_cacache
+    npm config set cache /tmp/npm-cache && \
+    npm config set tmp /tmp/npm-tmp && \
+    mkdir -p /tmp/npm-cache /tmp/npm-tmp
 
 # Install dependencies early (for caching)
 COPY package.json package-lock.json ./
 
-# Install with reduced parallelism and memory usage to avoid space issues
-RUN npm ci --maxsockets=1 --prefer-offline --no-audit --no-fund && \
-    npm cache clean --force
+# Install with maximum space optimization
+RUN npm ci --cache /tmp/npm-cache --tmp /tmp/npm-tmp --maxsockets=1 --no-audit --no-fund --no-optional && \
+    rm -rf /tmp/npm-cache /tmp/npm-tmp /root/.npm
 
 # Copy Prisma schema and generate client
 COPY prisma ./prisma
-RUN npx prisma generate
+RUN npx prisma generate && rm -rf /root/.npm
 
 # Copy rest of the app and build it
 COPY . .
 RUN npm run build && \
-    # Clean up build artifacts and cache to save space
-    npm cache clean --force && \
-    rm -rf /root/.npm/_cacache && \
-    rm -rf node_modules/.cache
+    # Aggressive cleanup after build
+    rm -rf node_modules/.cache /root/.npm /tmp/* && \
+    # Keep only production node_modules for copying to runner
+    npm ci --omit=dev --no-audit --no-fund --no-optional && \
+    rm -rf /root/.npm /tmp/*
 
 # Stage 2: Run app with production settings
 FROM node:20-alpine AS runner
@@ -49,16 +51,12 @@ COPY --from=builder --chown=nextjs:nodejs /app/public ./public
 COPY --from=builder --chown=nextjs:nodejs /app/prisma ./prisma
 COPY --from=builder --chown=nextjs:nodejs /app/package.json ./package.json
 COPY --from=builder --chown=nextjs:nodejs /app/package-lock.json ./package-lock.json
+COPY --from=builder --chown=nextjs:nodejs /app/node_modules ./node_modules
 
 # Switch to non-root user
 USER nextjs
 
-# Install only production dependencies with space-saving options
-RUN npm cache clean --force && \
-    npm ci --omit=dev --maxsockets=1 --prefer-offline --no-audit --no-fund && \
-    npm cache clean --force
-
-# Generate Prisma client for Alpine compatibility
+# Generate Prisma client for Alpine compatibility (no need to reinstall deps)
 RUN npx prisma generate
 
 # Environment variables
