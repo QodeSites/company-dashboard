@@ -36,7 +36,8 @@ export default function AccountDetailsPage() {
         if (!res.ok) {
           throw new Error("Failed to fetch account details");
         }
-        const accounts: Account[] = await res.json();
+        const data = await res.json();
+        const accounts: Account[] = data.accounts;
         const found = accounts.find(acc => acc.qcode === qcode)!
         setAccount({
           ...found,

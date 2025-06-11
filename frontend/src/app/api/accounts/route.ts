@@ -1,4 +1,3 @@
-// @ts-nocheck
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { randomUUID } from 'crypto';
@@ -21,6 +20,7 @@ export async function POST(req: NextRequest) {
       aadhar,
       pan,
       remarks = 'NA',
+      custodian_codes,
     } = body;
 
     // Validate required fields
@@ -41,9 +41,27 @@ export async function POST(req: NextRequest) {
     // Validate user allocations (required for all account types)
     if (!user_allocations || !Array.isArray(user_allocations) || user_allocations.length === 0) {
       return NextResponse.json(
-        { message: 'user_allocations is required and must be a non-empty array' },
+        { message: 'user_allocationsatisfies and must be a non-empty array' },
         { status: 400 }
       );
+    }
+
+    // Validate custodian codes for PMS accounts
+    if (account_type === 'pms') {
+      if (!custodian_codes || !Array.isArray(custodian_codes) || custodian_codes.length === 0) {
+        return NextResponse.json(
+          { message: 'custodian_codes is required and must be a non-empty array for PMS accounts' },
+          { status: 400 }
+        );
+      }
+      // Ensure all codes are non-empty strings
+      const validCodes = custodian_codes.filter((code: any) => typeof code === 'string' && code.trim() !== '');
+      if (validCodes.length === 0) {
+        return NextResponse.json(
+          { message: 'At least one valid, non-empty custodian code is required for PMS accounts' },
+          { status: 400 }
+        );
+      }
     }
 
     const result = await prisma.$transaction(async (tx) => {
@@ -101,27 +119,20 @@ export async function POST(req: NextRequest) {
         },
       });
 
-      // Create master sheet table
-      await tx.$executeRawUnsafe(`
-        CREATE TABLE IF NOT EXISTS master_sheet (
-          id SERIAL PRIMARY KEY,
-          qcode VARCHAR(20) NOT NULL,
-          date DATE NOT NULL,
-          portfolio_value DECIMAL(20,4),
-          capital_in_out DECIMAL(20,4),
-          nav DECIMAL(20,4),
-          prev_nav DECIMAL(20,4),
-          pnl DECIMAL(20,4),
-          daily_p_l DECIMAL(20,4),
-          exposure_value DECIMAL(20,4),
-          prev_portfolio_value DECIMAL(20,4),
-          prev_exposure_value DECIMAL(20,4),
-          prev_pnl DECIMAL(20,4),
-          drawdown DECIMAL(20,4),
-          system_tag VARCHAR(50),
-          created_at DATE DEFAULT CURRENT_DATE
-        );
-      `);
+      // Handle custodian codes for PMS accounts
+      if (account_type === 'pms' && custodian_codes) {
+        for (const code of custodian_codes) {
+          const trimmedCode = code.trim();
+          if (trimmedCode) {
+            await tx.account_custodian_codes.create({
+              data: {
+                qcode: newQcode,
+                custodian_code: trimmedCode,
+              },
+            });
+          }
+        }
+      }
 
       // Handle user allocations
       interface UserAllocation {
@@ -144,7 +155,7 @@ export async function POST(req: NextRequest) {
         const { icode, date, amount, access_level } = alloc;
 
         // Validate allocation fields
-        if (!icode || !date) {
+        if (!icode) {
           throw new Error('Each allocation must have icode and date');
         }
 
@@ -186,7 +197,7 @@ export async function POST(req: NextRequest) {
             qcode_icode_allocation_date: {
               qcode: newQcode,
               icode,
-              allocation_date: new Date(date),
+              allocation_date: new Date(),
             },
           },
           update: {
@@ -196,7 +207,7 @@ export async function POST(req: NextRequest) {
           create: {
             qcode: newQcode,
             icode,
-            allocation_date: new Date(date),
+            allocation_date: new Date(),
             contribution_amount: allocationAmount,
             allocation_percent: allocationPercent,
           },
@@ -206,7 +217,7 @@ export async function POST(req: NextRequest) {
       return account;
     });
 
-    return NextResponse.json({ message: 'Account created with master sheet and allocations!', account: result });
+    return NextResponse.json({ message: 'Account created with allocations and custodian codes!', account: result });
   } catch (error: unknown) {
     const errorMessage = error instanceof Error ? error.message : 'An unexpected error occurred';
     console.error('POST /api/accounts error:', errorMessage);
@@ -214,23 +225,66 @@ export async function POST(req: NextRequest) {
   }
 }
 
-export async function GET() {
+export async function GET(req: NextRequest) {
   try {
+    // Extract account_type from query parameters
+    const { searchParams } = new URL(req.url);
+    const accountType = searchParams.get('account_type');
+
+    // Validate account_type if provided
+    if (accountType && !['pms', 'managed_account', 'prop'].includes(accountType)) {
+      return NextResponse.json(
+        { message: "Invalid account_type. Must be 'pms', 'managed_account', or 'prop'" },
+        { status: 400 }
+      );
+    }
+
+    // Build the where clause based on account_type
+    const whereClause = accountType ? { account_type: accountType } : {};
+
+    // Fetch accounts with related custodian codes
     const accounts = await prisma.accounts.findMany({
+      where: whereClause,
       select: {
         qcode: true,
         account_name: true,
         account_type: true,
+        broker: true,
+        email_linked: true,
+        contact_number: true,
+        login_id: true,
+        totp_secret: true,
+        api_details: true,
+        nominees: true,
+        aadhar: true,
+        pan: true,
+        remarks: true,
+        account_id: true,
+        created_at: true,
+        account_custodian_codes: {
+          select: {
+            custodian_code: true,
+            created_at: true,
+          },
+        },
       },
       orderBy: {
         created_at: 'desc',
       },
     });
 
-    return NextResponse.json(accounts);
-  } catch (error) {
-    console.error('GET /api/accounts error:', error);
-    return NextResponse.json({ message: 'Error fetching accounts' }, { status: 500 });
+    if (!accounts.length) {
+      return NextResponse.json(
+        { message: `No accounts found${accountType ? ` for type ${accountType}` : ''}` },
+        { status: 404 }
+      );
+    }
+
+    return NextResponse.json({ accounts });
+  } catch (error: unknown) {
+    const errorMessage = error instanceof Error ? error.message : 'An unexpected error occurred';
+    console.error('GET /api/accounts error:', errorMessage);
+    return NextResponse.json({ message: `❌ Error fetching accounts: ${errorMessage}` }, { status: 500 });
   }
 }
 
@@ -267,15 +321,29 @@ export async function DELETE(req: NextRequest) {
         },
       });
 
-      // Delete related pooled account data for prop accounts
-      if (account.account_type === 'prop') {
-        await tx.pooled_account_users.deleteMany({
-          where: { qcode },
-        });
-        await tx.pooled_account_allocations.deleteMany({
-          where: { qcode },
-        });
-      }
+      // Delete related pooled account data for ALL account types
+      await tx.pooled_account_users.deleteMany({
+        where: { qcode },
+      });
+
+      // Delete related pooled account allocations
+      await tx.pooled_account_allocations.deleteMany({
+        where: { qcode },
+      });
+
+      // Delete related account custodian codes
+      await tx.account_custodian_codes.deleteMany({
+        where: { qcode },
+      });
+
+      // Delete related records from other tables referencing accounts.qcode
+      await tx.capital_in_out.deleteMany({ where: { qcode } });
+      await tx.equity_holding.deleteMany({ where: { qcode } });
+      await tx.gold_tradebook.deleteMany({ where: { qcode } });
+      await tx.liquidbees_tradebook.deleteMany({ where: { qcode } });
+      await tx.mutual_fund_holding.deleteMany({ where: { qcode } });
+      await tx.slippage.deleteMany({ where: { qcode } });
+      await tx.tradebook.deleteMany({ where: { qcode } });
 
       // Delete the account
       await tx.accounts.delete({

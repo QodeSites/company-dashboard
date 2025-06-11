@@ -39,6 +39,7 @@ model accounts {
   created_at                                                DateTime                     @default(now())
   account_access_account_access_source_account_idToaccounts account_access[]             @relation("account_access_source_account_idToaccounts")
   account_access_account_access_target_account_idToaccounts account_access[]             @relation("account_access_target_account_idToaccounts")
+  account_custodian_codes                                   account_custodian_codes[]
   pooled_account_allocations                                pooled_account_allocations[]
   pooled_account_users                                      pooled_account_users[]
 }
@@ -302,4 +303,15 @@ model tradebook {
   @@index([qcode], map: "idx_tradebook_qcode")
   @@index([symbol_entry], map: "idx_tradebook_symbol_entry")
   @@index([timestamp_entry], map: "idx_tradebook_timestamp_entry")
+}
+
+model account_custodian_codes {
+  id             Int      @id @default(autoincrement())
+  qcode          String   @db.VarChar(20)
+  custodian_code String   @db.VarChar(50)
+  created_at     DateTime @default(now()) @db.Timestamptz(6)
+  accounts       accounts @relation(fields: [qcode], references: [qcode], onDelete: Cascade, onUpdate: NoAction, map: "fk_account_custodian_codes_account")
+
+  @@unique([qcode, custodian_code], map: "uq_account_custodian_codes_qcode_custodian_code")
+  @@index([qcode], map: "idx_account_custodian_codes_qcode")
 }
