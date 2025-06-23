@@ -11,7 +11,7 @@ import LineChartOne from "@/components/charts/line/LineChartOne";
 import DefaultTab from "@/components/ui/tab/DefaultTab";
 import { ChevronDown, ChevronUp, SortAsc, SortDesc } from "lucide-react";
 import { sharedTableConfigs } from '../../shared-config/column';
-
+import { API_BASE } from "@/lib/api";
 interface Row {
     id: number;
     [key: string]: unknown;
@@ -56,7 +56,7 @@ const tableConfigs = Object.entries(sharedTableConfigs).reduce((acc, [key, value
     acc[key] = {
         requiredColumns: value.requiredColumns,
         dateField: value.dateField,
-        endpoint: `http://192.168.0.166:8080/api/upload/master-sheet/`,
+        endpoint: `${API_BASE}/api/upload/master-sheet/`,
         displayName: value.displayName,
     };
     return acc;
@@ -449,7 +449,7 @@ export default function PropsAndManagedAccount({ qcode }: PropsAndManagedAccount
         setOperationResult((prev) => ({ ...prev, [tableName]: null }));
         try {
             console.log(`Initiating delete operation for ${tableName}:`, qcode, "Date range:", filterStartDate[tableName], "to", filterEndDate[tableName]);
-            const res = await fetch("http://192.168.0.166:8080/api/replace/delete/", {
+            const res = await fetch(`${API_BASE}/api/replace/delete/`, {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({
@@ -497,7 +497,7 @@ export default function PropsAndManagedAccount({ qcode }: PropsAndManagedAccount
         setOperationResult((prev) => ({ ...prev, [tableName]: null }));
         try {
             console.log(`Initiating combined operation (delete) for ${tableName}:`, qcode, "Date range:", filterStartDate[tableName], "to", filterEndDate[tableName]);
-            const deleteRes = await fetch("http://192.168.0.166:8080/api/replace/delete/", {
+            const deleteRes = await fetch(`${API_BASE}/api/replace/delete/`, {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({
@@ -608,7 +608,7 @@ export default function PropsAndManagedAccount({ qcode }: PropsAndManagedAccount
                 console.log("Replace master sheet upload completed, server processing started");
             });
             const response: UploadResponse = await new Promise((resolve, reject) => {
-                xhr.open("POST", "http://192.168.0.166:8080/api/replace/master-sheet");
+                xhr.open("POST", `${API_BASE}/api/replace/master-sheet`);
                 xhr.onload = () => {
                     if (xhr.status >= 200 && xhr.status < 300) {
                         resolve(JSON.parse(xhr.responseText));
