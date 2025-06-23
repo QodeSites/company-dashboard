@@ -12,7 +12,7 @@ WORKDIR /app
 # install dependencies
 COPY package.json package-lock.json ./
 RUN mkdir -p /tmp/npm-cache \
-    && npm ci --cache /tmp/npm-cache --maxsockets=1 --no-audit --no-fund --no-optional
+    && npm ci --cache /tmp/npm-cache --maxsockets=1 --no-audit --no-fund
 
 # generate Prisma client
 COPY prisma ./prisma
