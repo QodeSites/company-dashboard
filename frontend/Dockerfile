@@ -1,53 +1,46 @@
-# --- Stage 1: build ---
+# ─── Stage 1: Install & build ───────────────────────────────────────────
 FROM node:20-alpine AS builder
+# enable BuildKit cache mounts
+# syntax = docker/dockerfile:1.4
 
-# ensure npm cache directory
-ENV NPM_CONFIG_CACHE=/tmp/npm-cache
+WORKDIR /app
 
 # update npm
 RUN npm install -g npm@11.4.1
 
-WORKDIR /app
-
-# install dependencies
+# copy only lockfiles for cache-friendly layer
 COPY package.json package-lock.json ./
-RUN mkdir -p /tmp/npm-cache \
-    && npm ci --cache /tmp/npm-cache --maxsockets=1 --no-audit --no-fund
+
+# use BuildKit mount for ~/.npm
+RUN --mount=type=cache,id=npm,target=/root/.npm \
+    npm ci \
+      --cache /root/.npm \
+      --prefer-offline \
+      --no-audit \
+      --no-fund
 
 # generate Prisma client
 COPY prisma ./prisma
 RUN npx prisma generate
 
-# build app
+# build
 COPY . .
-RUN npm run build \
-    && rm -rf /tmp/npm-cache /root/.npm
+RUN npm run build
 
-# --- Stage 2: runtime ---
+# ─── Stage 2: Runtime ─────────────────────────────────────────────────
 FROM node:20-alpine AS runner
 
-# update npm
+WORKDIR /app
 RUN npm install -g npm@11.4.1
 
-WORKDIR /app
+# create unprivileged user
+RUN addgroup -S nodejs && adduser -S nextjs -G nodejs
 
-# create non-root user
-RUN addgroup -S nodejs \
-    && adduser -S nextjs -G nodejs
-
-# copy build outputs and production deps
-COPY --from=builder --chown=nextjs:nodejs /app/.next ./.next
-COPY --from=builder --chown=nextjs:nodejs /app/public ./public
-COPY --from=builder --chown=nextjs:nodejs /app/prisma ./prisma
-COPY --from=builder --chown=nextjs:nodejs /app/package.json ./package.json
-COPY --from=builder --chown=nextjs:nodejs /app/node_modules ./node_modules
+COPY --from=builder --chown=nextjs:nodejs /app ./
 
 USER nextjs
-
-# regenerate Prisma client for Alpine
 RUN npx prisma generate
 
-# runtime settings
 ENV NODE_ENV=production
 ENV PORT=3002
 EXPOSE 3002
