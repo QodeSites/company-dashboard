@@ -39,9 +39,15 @@ app = FastAPI(
     debug=True
 )
 
+origins = [
+    "https://client.qodeinvest.com",
+    # Add any other trusted origins if needed
+]
+
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=origins,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
