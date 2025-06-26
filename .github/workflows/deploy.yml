@@ -53,7 +53,7 @@ jobs:
           set -e
           VPS_PORT="${{ secrets.VPS_PORT }}"
           VPS_PORT="${VPS_PORT:-22}"
-          ssh -i ~/.ssh/id_rsa -p ${VPS_PORT} ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }} << 'EOF'
+          ssh -o ServerAliveInterval=60 -i ~/.ssh/id_rsa -p ${VPS_PORT} ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }} << 'EOF'
           set -e
           cd ${{ secrets.TARGET_DIR }}
           if command -v docker-compose > /dev/null 2>&1; then
