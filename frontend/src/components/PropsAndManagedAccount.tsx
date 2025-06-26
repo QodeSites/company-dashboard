@@ -576,84 +576,63 @@ export default function PropsAndManagedAccount({ qcode }: PropsAndManagedAccount
     };
 
     const handleReplaceMasterSheet = async () => {
-        const file = files.master_sheet;
-        if (!file) {
-            alert("Please select a CSV file to upload for master_sheet.");
-            console.error("No file selected for replace master_sheet");
-            return;
+    const file = files.master_sheet;
+    if (!file) {
+        alert("Please select a CSV file to upload for master_sheet.");
+        return;
+    }
+    if (!confirm("This will DELETE ALL existing data for this qcode in the master sheet and replace it with the new CSV data. This action cannot be undone. Are you sure you want to proceed?")) {
+        return;
+    }
+    setIsUploading((prev) => ({ ...prev, master_sheet: true }));
+    setIsProcessing((prev) => ({ ...prev, master_sheet: false }));
+    setOperationType("replace");
+    setUploadProgress((prev) => ({ ...prev, master_sheet: 0 }));
+    setOperationResult((prev) => ({ ...prev, master_sheet: null }));
+    const formData = new FormData();
+    formData.append("qcode", qcode);
+    formData.append("file", file);
+    try {
+        const controller = new AbortController();
+        const response = await fetch(`${API_BASE}/api/replace/master-sheet`, {
+            method: "POST",
+            body: formData,
+            signal: controller.signal,
+        });
+        if (!response.ok) {
+            throw new Error(`Replacement failed with status ${response.status}: ${response.statusText}`);
         }
-        if (!confirm("This will DELETE ALL existing data for this qcode in the master sheet and replace it with the new CSV data. This action cannot be undone. Are you sure you want to proceed?")) {
-            return;
+        const result: UploadResponse = await response.json();
+        setOperationResult((prev) => ({ ...prev, master_sheet: result }));
+        if (result.totalRows === 0 || result.insertedRows === 0) {
+            const errorMessage = result.firstError
+                ? `First error: ${result.firstError.error} (Row ${result.firstError.rowIndex})`
+                : "Unknown error";
+            alert(`⚠️ ${result.message}\n${errorMessage}\nCheck Operation Result for details on failed rows.`);
+        } else {
+            const message = `${result.message}${result.failedRows && result.failedRows.length > 0
+                ? `\nFirst error: ${result.firstError?.error} (Row ${result.firstError?.rowIndex})\nCheck Operation Result for details on ${result.failedRows.length} failed rows.`
+                : ""
+            }`;
+            alert(`✅ ${message}`);
+            fetchTableData("master_sheet");
+            fetchChartData();
         }
-        setIsUploading((prev) => ({ ...prev, master_sheet: true }));
+    } catch (err: unknown) {
+        const errorMessage = err instanceof Error ? err.message : "An unexpected error occurred";
+        console.error("Replace master sheet failed:", errorMessage);
+        alert(`❌ Replacement failed: ${errorMessage}. If this is a CORS issue, please contact the server administrator.`);
+    } finally {
+        setIsUploading((prev) => ({ ...prev, master_sheet: false }));
         setIsProcessing((prev) => ({ ...prev, master_sheet: false }));
-        setOperationType("replace");
-        setUploadProgress((prev) => ({ ...prev, master_sheet: 0 }));
-        setOperationResult((prev) => ({ ...prev, master_sheet: null }));
-        const formData = new FormData();
-        formData.append("qcode", qcode);
-        formData.append("file", file);
-        try {
-            console.log("Initiating replace master sheet to /api/replace-master-sheet for qcode:", qcode);
-            const xhr = new XMLHttpRequest();
-            xhr.upload.addEventListener("progress", (event) => {
-                if (event.lengthComputable) {
-                    const percentComplete = (event.loaded / event.total) * 100;
-                    setUploadProgress((prev) => ({ ...prev, master_sheet: Math.min(Math.round(percentComplete), 99) }));
-                    console.log(`Replace master sheet progress: ${percentComplete.toFixed(2)}%`);
-                }
-            });
-            xhr.upload.addEventListener("load", () => {
-                setIsProcessing((prev) => ({ ...prev, master_sheet: true }));
-                console.log("Replace master sheet upload completed, server processing started");
-            });
-            const response: UploadResponse = await new Promise((resolve, reject) => {
-                xhr.open("POST", `${API_BASE}/api/replace/master-sheet`);
-                xhr.onload = () => {
-                    if (xhr.status >= 200 && xhr.status < 300) {
-                        resolve(JSON.parse(xhr.responseText));
-                    } else {
-                        console.error("Replace master sheet failed with response:", xhr.responseText);
-                        reject(new Error(`Replacement failed with status ${xhr.status}: ${xhr.statusText}`));
-                    }
-                };
-                xhr.onerror = () => reject(new Error("Network error during replacement"));
-                xhr.send(formData);
-            });
-            setOperationResult((prev) => ({ ...prev, master_sheet: response }));
-            if (response.totalRows === 0 || response.insertedRows === 0) {
-                console.error("Replace master sheet failed, no rows inserted:", response);
-                const errorMessage = response.firstError
-                    ? `First error: ${response.firstError.error} (Row ${response.firstError.rowIndex})`
-                    : "Unknown error";
-                alert(
-                    `⚠️ ${response.message}\n${errorMessage}\nCheck Operation Result for details on failed rows.`
-                );
-            } else {
-                const message = `${response.message}${response.failedRows && response.failedRows.length > 0
-                    ? `\nFirst error: ${response.firstError?.error} (Row ${response.firstError?.rowIndex})\nCheck Operation Result for details on ${response.failedRows.length} failed rows.`
-                    : ""
-                    }`;
-                console.log("Replace master sheet successful:", message);
-                alert(`✅ ${message}`);
-                fetchTableData("master_sheet");
-                fetchChartData();
-            }
-        } catch (err: unknown) {
-            const errorMessage = err instanceof Error ? err.message : "An unexpected error occurred";
-            console.error("Replace master sheet failed:", errorMessage);
-            alert(`❌ Replacement failed: ${errorMessage}`);
-        } finally {
-            setIsUploading((prev) => ({ ...prev, master_sheet: false }));
-            setIsProcessing((prev) => ({ ...prev, master_sheet: false }));
-            setOperationType(null);
-            setFiles((prev) => ({ ...prev, master_sheet: null }));
-            setCsvPreviews((prev) => ({ ...prev, master_sheet: [] }));
-            setFilterStartDate((prev) => ({ ...prev, master_sheet: null }));
-            setFilterEndDate((prev) => ({ ...prev, master_sheet: null }));
-            if (fileInputRefs.master_sheet.current) fileInputRefs.master_sheet.current.value = "";
-        }
-    };
+        setOperationType(null);
+        setFiles((prev) => ({ ...prev, master_sheet: null }));
+        setCsvPreviews((prev) => ({ ...prev, master_sheet: [] }));
+        setFilterStartDate((prev) => ({ ...prev, master_sheet: null }));
+        setFilterEndDate((prev) => ({ ...prev, master_sheet: null }));
+        if (fileInputRefs.master_sheet.current) fileInputRefs.master_sheet.current.value = "";
+    }
+};
 
     const exportToExcel = (tableName: string) => {
         const formattedData = sheetData[tableName].map((row) => {
