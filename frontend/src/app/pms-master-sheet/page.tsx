@@ -58,7 +58,7 @@ const UploadPMSData = () => {
     formData.append("holding_file", holdingFile!);
 
     try {
-      const response = await fetch("http://192.168.0.166:8080/upload/consolidated-sheet/", {
+      const response = await fetch("https://reporting-backend.qodeinvest.com/upload/consolidated-sheet/", {
         method: "POST",
         body: formData,
       });
