@@ -5,7 +5,7 @@ from app.routers.upload import router as upload_router
 from app.routers.consolidated import router as consolidated_router
 from dotenv import load_dotenv
 from starlette.middleware.base import BaseHTTPMiddleware
-# from app.routers.pms_master_sheet import router as master_sheet_router
+from starlette.middleware.trustedhost import TrustedHostMiddleware
 import os
 import logging
 import traceback
@@ -31,11 +31,12 @@ class ProxyHeadersMiddleware(BaseHTTPMiddleware):
             request.scope["scheme"] = request.headers["X-Forwarded-Proto"]
         return await call_next(request)
 
-# Create FastAPI app ONCE
+# Create FastAPI app with redirect_slashes=False to prevent automatic redirects
 app = FastAPI(
     title="Portfolio API",
     description="API for processing financial data",
-    debug=True
+    debug=True,
+    redirect_slashes=False  # This prevents automatic trailing slash redirects
 )
 
 # Add proxy headers middleware first
@@ -59,7 +60,6 @@ app.add_middleware(
 # Include routers
 app.include_router(upload_router)
 app.include_router(consolidated_router)
-# app.include_router(master_sheet_router, dependencies=[Depends(get_db)])
 
 @app.get("/")
 async def root():
@@ -73,7 +73,6 @@ async def check_env():
 @app.on_event("startup")
 async def startup():
     logger.info("Application startup")
-    # Removed database connection code as per request
 
 @app.exception_handler(Exception)
 async def custom_exception_handler(request, exc):
