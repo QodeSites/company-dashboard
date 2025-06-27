@@ -4,6 +4,7 @@ from fastapi.responses import JSONResponse
 from app.routers.upload import router as upload_router
 from app.routers.consolidated import router as consolidated_router
 from dotenv import load_dotenv
+from starlette.middleware.base import BaseHTTPMiddleware
 # from app.routers.pms_master_sheet import router as master_sheet_router
 import os
 import logging
@@ -32,7 +33,19 @@ load_dotenv("../.env")
 #         yield db
 #     finally:
 #         await db.disconnect()
+class ProxyHeadersMiddleware(BaseHTTPMiddleware):
+    async def dispatch(self, request, call_next):
+        if "X-Forwarded-Proto" in request.headers:
+            request.scope["scheme"] = request.headers["X-Forwarded-Proto"]
+        return await call_next(request)
 
+app = FastAPI(
+    title="Portfolio API",
+    description="API for processing financial data",
+    debug=True
+)
+
+app.add_middleware(ProxyHeadersMiddleware)
 app = FastAPI(
     title="Portfolio API",
     description="API for processing financial data",
