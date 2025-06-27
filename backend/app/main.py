@@ -25,39 +25,29 @@ logger = logging.getLogger(__name__)
 
 load_dotenv("../.env")
 
-# Dependency for Prisma
-# async def get_db():
-#     db = Prisma()
-#     await db.connect()
-#     try:
-#         yield db
-#     finally:
-#         await db.disconnect()
 class ProxyHeadersMiddleware(BaseHTTPMiddleware):
     async def dispatch(self, request, call_next):
         if "X-Forwarded-Proto" in request.headers:
             request.scope["scheme"] = request.headers["X-Forwarded-Proto"]
         return await call_next(request)
 
+# Create FastAPI app ONCE
 app = FastAPI(
     title="Portfolio API",
     description="API for processing financial data",
     debug=True
 )
 
+# Add proxy headers middleware first
 app.add_middleware(ProxyHeadersMiddleware)
-app = FastAPI(
-    title="Portfolio API",
-    description="API for processing financial data",
-    debug=True
-)
 
+# CORS origins
 origins = [
     "https://client.qodeinvest.com",
     # Add any other trusted origins if needed
 ]
 
-
+# Add CORS middleware
 app.add_middleware(
     CORSMiddleware,
     allow_origins=origins,
@@ -66,6 +56,7 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+# Include routers
 app.include_router(upload_router)
 app.include_router(consolidated_router)
 # app.include_router(master_sheet_router, dependencies=[Depends(get_db)])
