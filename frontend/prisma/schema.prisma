@@ -22,7 +22,7 @@ model account_access {
 model accounts {
   id                                                        Int                          @id @default(autoincrement())
   account_id                                                String?                      @unique
-  qcode                                                     String                       @unique
+  qcode                                                     String                       @unique @default(dbgenerated("('QAC'::text || lpad((nextval('accounts_qcode_seq'::regclass))::text, 5, '0'::text))"))
   account_name                                              String
   broker                                                    String
   account_type                                              String
@@ -81,7 +81,7 @@ model capital_in_out {
 model clients {
   id                         Int                          @id(map: "users_pkey") @default(autoincrement())
   user_id                    String                       @unique(map: "users_user_id_key")
-  icode                      String                       @unique(map: "users_icode_key")
+  icode                      String                       @unique(map: "users_icode_key") @default(dbgenerated("('QUS'::text || lpad((nextval('clients_icode_seq'::regclass))::text, 4, '0'::text))"))
   user_name                  String
   email                      String
   contact_number             String
@@ -240,7 +240,7 @@ model pooled_account_allocations {
   contribution_amount Decimal?  @db.Decimal
   allocation_percent  Decimal?  @db.Decimal
   created_at          DateTime? @default(now()) @db.Timestamp(6)
-  clients             clients?  @relation(fields: [icode], references: [icode], onDelete: NoAction, onUpdate: NoAction)
+  clients             clients?  @relation(fields: [icode], references: [icode], onDelete: Restrict)
   accounts            accounts? @relation(fields: [qcode], references: [qcode], onDelete: NoAction, onUpdate: NoAction)
 
   @@unique([qcode, icode, allocation_date])
@@ -314,4 +314,26 @@ model account_custodian_codes {
 
   @@unique([qcode, custodian_code], map: "uq_account_custodian_codes_qcode_custodian_code")
   @@index([qcode], map: "idx_account_custodian_codes_qcode")
+}
+
+model pms_master_sheet {
+  id                        Int       @id @default(autoincrement())
+  client_name               String    @db.VarChar(255)
+  account_code              String    @db.VarChar(50)
+  report_date               DateTime  @db.Date
+  portfolio_value           Decimal?  @db.Decimal(20, 2)
+  cash_in_out               Decimal?  @db.Decimal(20, 2)
+  nav                       Decimal?  @db.Decimal(20, 4)
+  prev_nav                  Decimal?  @db.Decimal(20, 4)
+  pnl                       Decimal?  @db.Decimal(20, 2)
+  pnl_percent               Decimal?  @db.Decimal(10, 2)
+  exposure_value            Decimal?  @db.Decimal(20, 2)
+  prev_portfolio_value      Decimal?  @db.Decimal(20, 2)
+  prev_exposure_value       Decimal?  @db.Decimal(20, 2)
+  prev_pnl                  Decimal?  @db.Decimal(20, 2)
+  drawdown_percent          Decimal?  @db.Decimal(10, 2)
+  system_tag                String?   @db.VarChar(50)
+  period_return_percent     Decimal?  @db.Decimal(10, 4)
+  cumulative_return_percent Decimal?  @db.Decimal(10, 4)
+  created_at                DateTime? @default(now()) @db.Timestamptz(6)
 }
