@@ -265,7 +265,7 @@ async def replace_master_sheet(
         raise HTTPException(status_code=500, detail=f"Unexpected error: {str(e)}")
 
 # Routes for each table upload
-@router.post("/upload/master-sheet/")
+@router.post("/upload/master-sheet")
 async def upload_master_sheet(
     file: UploadFile = File(...),
     qcode: str = Form(...),
@@ -275,7 +275,7 @@ async def upload_master_sheet(
 ):
     return await upload_csv(file, qcode, startDate, endDate, db, "master_sheet")
 
-@router.post("/upload/tradebook/")
+@router.post("/upload/tradebook")
 async def upload_tradebook(
     file: UploadFile = File(...),
     qcode: str = Form(...),
@@ -285,7 +285,7 @@ async def upload_tradebook(
 ):
     return await upload_csv(file, qcode, startDate, endDate, db, "tradebook")
 
-@router.post("/upload/slippage/")
+@router.post("/upload/slippage")
 async def upload_slippage(
     file: UploadFile = File(...),
     qcode: str = Form(...),
@@ -295,7 +295,7 @@ async def upload_slippage(
 ):
     return await upload_csv(file, qcode, startDate, endDate, db, "slippage")
 
-@router.post("/upload/mutual-fund-holding/")
+@router.post("/upload/mutual-fund-holding")
 async def upload_mutual_fund_holding(
     file: UploadFile = File(...),
     qcode: str = Form(...),
@@ -305,7 +305,7 @@ async def upload_mutual_fund_holding(
 ):
     return await upload_csv(file, qcode, startDate, endDate, db, "mutual_fund_holding")
 
-@router.post("/upload/gold-tradebook/")
+@router.post("/upload/gold-tradebook")
 async def upload_gold_tradebook(
     file: UploadFile = File(...),
     qcode: str = Form(...),
@@ -315,7 +315,7 @@ async def upload_gold_tradebook(
 ):
     return await upload_csv(file, qcode, startDate, endDate, db, "gold_tradebook")
 
-@router.post("/upload/liquidbees-tradebook/")
+@router.post("/upload/liquidbees-tradebook")
 async def upload_liquidbees_tradebook(
     file: UploadFile = File(...),
     qcode: str = Form(...),
@@ -326,7 +326,7 @@ async def upload_liquidbees_tradebook(
     return await upload_csv(file, qcode, startDate, endDate, db, "liquidbees_tradebook")
 
 # Delete route
-@router.post("/replace/delete/")
+@router.post("/replace/delete")
 async def delete_records_route(
     data: Dict[str, Any],
     db: Prisma = Depends(get_db)
@@ -346,7 +346,7 @@ async def delete_records_route(
         raise HTTPException(status_code=500, detail=f"Error processing delete request: {str(e)}")
 
 # Replace route for master_sheet
-@router.post("/replace/master-sheet/")
+@router.post("/replace/master-sheet")
 async def replace_master_sheet_route(
     file: UploadFile = File(...),
     qcode: str = Form(...),
