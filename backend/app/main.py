@@ -45,6 +45,7 @@ app.add_middleware(ProxyHeadersMiddleware)
 # CORS origins
 origins = [
     "https://client.qodeinvest.com",
+    "http://localhost:3000"
     # Add any other trusted origins if needed
 ]
 

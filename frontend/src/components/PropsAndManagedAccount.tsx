@@ -595,7 +595,7 @@ export default function PropsAndManagedAccount({ qcode }: PropsAndManagedAccount
     // Create AbortController
     const controller = new AbortController();
     try {
-        const url = `${API_BASE}/api/replace/master-sheet`;
+        const url = `${API_BASE}/api/replace/master-sheet/`;    
         console.log("Requesting URL:", url);
         const response = await fetch(url, {
             method: "POST",
