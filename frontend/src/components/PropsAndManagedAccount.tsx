@@ -576,71 +576,71 @@ export default function PropsAndManagedAccount({ qcode }: PropsAndManagedAccount
     };
 
     const handleReplaceMasterSheet = async () => {
-    const file = files.master_sheet;
-    if (!file) {
-        alert("Please select a CSV file to upload for master_sheet.");
-        return;
-    }
-    if (!confirm("This will DELETE ALL existing data for this qcode in the master sheet and replace it with the new CSV data. This action cannot be undone. Are you sure you want to proceed?")) {
-        return;
-    }
-    setIsUploading((prev) => ({ ...prev, master_sheet: true }));
-    setIsProcessing((prev) => ({ ...prev, master_sheet: false }));
-    setOperationType("replace");
-    setUploadProgress((prev) => ({ ...prev, master_sheet: 0 }));
-    setOperationResult((prev) => ({ ...prev, master_sheet: null }));
-    const formData = new FormData();
-    formData.append("qcode", qcode);
-    formData.append("file", file);
-    // Create AbortController
-    const controller = new AbortController();
-    try {
-        const url = `${API_BASE}/api/replace/master-sheet/`;    
-        console.log("Requesting URL:", url);
-        const response = await fetch(url, {
-            method: "POST",
-            body: formData,
-            signal: controller.signal, // Use the defined controller
-            redirect: "follow", // Follow redirects to handle any server-side redirects
-        });
-        console.log("Response status:", response.status, "OK:", response.ok, "URL:", response.url);
-        if (!response.ok) {
-            const errorText = await response.text();
-            console.error("Response error text:", errorText);
-            throw new Error(`Replacement failed with status ${response.status}: ${response.statusText}`);
+        const file = files.master_sheet;
+        if (!file) {
+            alert("Please select a CSV file to upload for master_sheet.");
+            return;
         }
-        const result = await response.json();
-        console.log("Response result:", result);
-        setOperationResult((prev) => ({ ...prev, master_sheet: result }));
-        if (result.totalRows === 0 || result.insertedRows === 0) {
-            const errorMessage = result.firstError
-                ? `First error: ${result.firstError.error} (Row ${result.firstError.rowIndex})`
-                : "Unknown error";
-            alert(`⚠️ ${result.message}\n${errorMessage}\nCheck Operation Result for details on failed rows.`);
-        } else {
-            const message = `${result.message}${result.failedRows && result.failedRows.length > 0
-                ? `\nFirst error: ${result.firstError?.error} (Row ${result.firstError?.rowIndex})\nCheck Operation Result for details on ${result.failedRows.length} failed rows.`
-                : ""
-            }`;
-            alert(`✅ ${message}`);
-            fetchTableData("master_sheet");
-            fetchChartData();
+        if (!confirm("This will DELETE ALL existing data for this qcode in the master sheet and replace it with the new CSV data. This action cannot be undone. Are you sure you want to proceed?")) {
+            return;
         }
-    } catch (err) {
-        const errorMessage = err instanceof Error ? err.message : "An unexpected error occurred";
-        console.error("Full error details:", err);
-        alert(`❌ Replacement failed: ${errorMessage}. Check the console for details.`);
-    } finally {
-        setIsUploading((prev) => ({ ...prev, master_sheet: false }));
+        setIsUploading((prev) => ({ ...prev, master_sheet: true }));
         setIsProcessing((prev) => ({ ...prev, master_sheet: false }));
-        setOperationType(null);
-        setFiles((prev) => ({ ...prev, master_sheet: null }));
-        setCsvPreviews((prev) => ({ ...prev, master_sheet: [] }));
-        setFilterStartDate((prev) => ({ ...prev, master_sheet: null }));
-        setFilterEndDate((prev) => ({ ...prev, master_sheet: null }));
-        if (fileInputRefs.master_sheet.current) fileInputRefs.master_sheet.current.value = "";
-    }
-};
+        setOperationType("replace");
+        setUploadProgress((prev) => ({ ...prev, master_sheet: 0 }));
+        setOperationResult((prev) => ({ ...prev, master_sheet: null }));
+        const formData = new FormData();
+        formData.append("qcode", qcode);
+        formData.append("file", file);
+        // Create AbortController
+        const controller = new AbortController();
+        try {
+            const url = `${API_BASE}/api/replace/master-sheet/`;
+            console.log("Requesting URL:", url);
+            const response = await fetch(url, {
+                method: "POST",
+                body: formData,
+                signal: controller.signal, // Use the defined controller
+                redirect: "follow", // Follow redirects to handle any server-side redirects
+            });
+            console.log("Response status:", response.status, "OK:", response.ok, "URL:", response.url);
+            if (!response.ok) {
+                const errorText = await response.text();
+                console.error("Response error text:", errorText);
+                throw new Error(`Replacement failed with status ${response.status}: ${response.statusText}`);
+            }
+            const result = await response.json();
+            console.log("Response result:", result);
+            setOperationResult((prev) => ({ ...prev, master_sheet: result }));
+            if (result.totalRows === 0 || result.insertedRows === 0) {
+                const errorMessage = result.firstError
+                    ? `First error: ${result.firstError.error} (Row ${result.firstError.rowIndex})`
+                    : "Unknown error";
+                alert(`⚠️ ${result.message}\n${errorMessage}\nCheck Operation Result for details on failed rows.`);
+            } else {
+                const message = `${result.message}${result.failedRows && result.failedRows.length > 0
+                    ? `\nFirst error: ${result.firstError?.error} (Row ${result.firstError?.rowIndex})\nCheck Operation Result for details on ${result.failedRows.length} failed rows.`
+                    : ""
+                    }`;
+                alert(`✅ ${message}`);
+                fetchTableData("master_sheet");
+                fetchChartData();
+            }
+        } catch (err) {
+            const errorMessage = err instanceof Error ? err.message : "An unexpected error occurred";
+            console.error("Full error details:", err);
+            alert(`❌ Replacement failed: ${errorMessage}. Check the console for details.`);
+        } finally {
+            setIsUploading((prev) => ({ ...prev, master_sheet: false }));
+            setIsProcessing((prev) => ({ ...prev, master_sheet: false }));
+            setOperationType(null);
+            setFiles((prev) => ({ ...prev, master_sheet: null }));
+            setCsvPreviews((prev) => ({ ...prev, master_sheet: [] }));
+            setFilterStartDate((prev) => ({ ...prev, master_sheet: null }));
+            setFilterEndDate((prev) => ({ ...prev, master_sheet: null }));
+            if (fileInputRefs.master_sheet.current) fileInputRefs.master_sheet.current.value = "";
+        }
+    };
 
     const exportToExcel = (tableName: string) => {
         const formattedData = sheetData[tableName].map((row) => {
