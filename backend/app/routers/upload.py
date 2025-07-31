@@ -102,7 +102,7 @@ async def upload_csv(
             "inserted_rows": success_count,
             "column_names": TABLE_COLUMNS[table_name],
             "first_error": failed_rows[0] if failed_rows else None,
-            "failed_rows": failed_rows[:10]
+            "failed_rows": failed_rows
         }
     except MultipartParseError as e:
         logger.error(f"Multipart parsing error: {str(e)}\n{traceback.format_exc()}")
@@ -247,9 +247,10 @@ async def replace_master_sheet(
             "message": f"{success_count} rows inserted, {len(failed_rows)} failed",
             "total_rows": len(data) + len(failed_rows),
             "inserted_rows": success_count,
+            "failed_count": len(failed_rows),  # Failed count
             "column_names": TABLE_COLUMNS["master_sheet"],
             "first_error": failed_rows[0] if failed_rows else None,
-            "failed_rows": failed_rows[:10]
+            "failed_rows": failed_rows
         }
     except MultipartParseError as e:
         logger.error(f"Multipart parsing error: {str(e)}\n{traceback.format_exc()}")

@@ -7,7 +7,7 @@ class MasterSheet(BaseModel):
     date: date
     portfolio_value: Optional[float] = None
     capital_in_out: Optional[float] = None
-    nav: Optional[float] = Field(None, gt=0)
+    nav: Optional[float] = Field(None, ge=0)
     prev_nav: Optional[float] = None
     pnl: Optional[float] = None
     daily_p_l: Optional[float] = None

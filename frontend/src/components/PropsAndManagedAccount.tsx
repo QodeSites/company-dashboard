@@ -682,7 +682,62 @@ export default function PropsAndManagedAccount({ qcode }: PropsAndManagedAccount
 
     const isOperationInProgress = Object.values(isUploading).some((v) => v) || Object.values(isProcessing).some((v) => v) || Object.values(isDeleting).some((v) => v);
 
-    // [Copy all function implementations from the original file here]
+
+    // Add this utility function to parse error messages better
+    const parseErrorMessage = (error: string): { message: string; field?: string; value?: string } => {
+        // Handle Pydantic validation errors
+        if (error.includes('validation error for MasterSheet')) {
+            // Extract field name and error type from Pydantic error
+            const fieldMatch = error.match(/(\w+)\s*\n\s*(.+?)\s*\[type=(\w+)/);
+            if (fieldMatch) {
+                const [, field, message, type] = fieldMatch;
+                return {
+                    message: `${field}: ${message}`,
+                    field: field,
+                    value: type
+                };
+            }
+
+            // Fallback for complex Pydantic errors
+            const simpleMatch = error.match(/validation error for MasterSheet[\s\S]*?(\w+)[\s\S]*?(Input should be .+?)(?:\s*\[|$)/);
+            if (simpleMatch) {
+                const [, field, message] = simpleMatch;
+                return {
+                    message: `${field}: ${message}`,
+                    field: field
+                };
+            }
+        }
+
+        // Handle decimal conversion errors
+        if (error.includes('Invalid decimal value')) {
+            const match = error.match(/Invalid decimal value in '(.+?)' at row (\d+): (.+)/);
+            if (match) {
+                const [, field, row, value] = match;
+                return {
+                    message: `Invalid value in '${field}': '${value}'`,
+                    field: field,
+                    value: value
+                };
+            }
+        }
+
+        // Handle date format errors
+        if (error.includes('Invalid Date format')) {
+            const match = error.match(/Invalid Date format at row (\d+): (.+?), expected (.+)/);
+            if (match) {
+                const [, row, value, expected] = match;
+                return {
+                    message: `Invalid date format: '${value}' (expected ${expected})`,
+                    field: 'Date',
+                    value: value
+                };
+            }
+        }
+
+        // Return original error if no pattern matches
+        return { message: error };
+    };
 
     useEffect(() => {
         fetchTableData("master_sheet");
@@ -870,83 +925,217 @@ export default function PropsAndManagedAccount({ qcode }: PropsAndManagedAccount
 
                 {operationResult[tableName] && (
                     <div className="bg-white dark:bg-gray-800 p-6 rounded-lg shadow-sm border border-gray-200 dark:border-gray-800">
-                        <h3 className="text-lg font-semibold text-gray-800 dark:text-white mb-4">Operation Result for {tableConfigs[tableName].displayName}</h3>
+                        <h3 className="text-lg font-semibold text-gray-800 dark:text-white mb-4">
+                            Operation Result for {tableConfigs[tableName].displayName}
+                        </h3>
+
                         <div className="space-y-6">
-                            <div
-                                className={
-                                    (operationResult[tableName]!.failedRows && operationResult[tableName]!.failedRows!.length > 0) || operationResult[tableName]!.message.includes("failed")
-                                        ? "p-4 border border-red-200 bg-red-50 dark:border-red-900 dark:bg-red-900/10 rounded-lg"
-                                        : "p-4 border border-green-200 bg-green-50 dark:border-green-900 dark:bg-green-900/10 rounded-lg"
-                                }
-                            >
-                                <h4
-                                    className={
-                                        (operationResult[tableName]!.failedRows && operationResult[tableName]!.failedRows!.length > 0) || operationResult[tableName]!.message.includes("failed")
-                                            ? "font-semibold text-red-800 dark:text-red-300"
-                                            : "font-semibold text-green-800 dark:text-green-300"
-                                    }
-                                >
+                            {/* Summary Section */}
+                            <div className={
+                                (operationResult[tableName]!.failedRows && operationResult[tableName]!.failedRows!.length > 0) ||
+                                    operationResult[tableName]!.message.includes("failed")
+                                    ? "p-4 border border-red-200 bg-red-50 dark:border-red-900 dark:bg-red-900/10 rounded-lg"
+                                    : "p-4 border border-green-200 bg-green-50 dark:border-green-900 dark:bg-green-900/10 rounded-lg"
+                            }>
+                                <h4 className={
+                                    (operationResult[tableName]!.failedRows && operationResult[tableName]!.failedRows!.length > 0) ||
+                                        operationResult[tableName]!.message.includes("failed")
+                                        ? "font-semibold text-red-800 dark:text-red-300"
+                                        : "font-semibold text-green-800 dark:text-green-300"
+                                }>
                                     {operationResult[tableName]!.message}
                                 </h4>
-                                {operationResult[tableName]!.deletedCount !== undefined && operationResult[tableName]!.deletedCount! > 0 && (
-                                    <p className="mt-1 text-sm text-gray-700 dark:text-gray-400">
-                                        Deleted {operationResult[tableName]!.deletedCount} existing rows for qcode {qcode}.
-                                    </p>
-                                )}
-                                {operationResult[tableName]!.failedRows && operationResult[tableName]!.failedRows!.length > 0 && (
-                                    <p className="mt-1 text-sm text-red-700 dark:text-red-400">
-                                        Found {operationResult[tableName]!.failedRows!.length} row(s) with errors. Below are details for the first{" "}
-                                        {Math.min(operationResult[tableName]!.failedRows!.length, 5)} issues:
-                                    </p>
-                                )}
-                            </div>
-                            {operationResult[tableName]!.failedRows && operationResult[tableName]!.failedRows!.length > 0 && (
-                                <div className="overflow-x-auto">
-                                    <Table>
-                                        <TableHeader className="border-b border-gray-100 dark:border-gray-700">
-                                            <TableRow>
-                                                <TableCell isHeader className="px-5 py-3 text-start text-xs text-gray-500 font-medium dark:text-gray-400">
-                                                    Row #
-                                                </TableCell>
-                                                <TableCell isHeader className="px-5 py-3 text-start text-xs text-gray-500 font-medium dark:text-gray-400">
-                                                    Error
-                                                </TableCell>
-                                                <TableCell isHeader className="px-5 py-3 text-start text-xs text-gray-500 font-medium dark:text-gray-400">
-                                                    Row Data
-                                                </TableCell>
-                                            </TableRow>
-                                        </TableHeader>
-                                        <TableBody className="divide-y divide-gray-100 dark:divide-gray-700">
-                                            {operationResult[tableName]!.failedRows!.slice(0, 5).map((row, index) => (
-                                                <TableRow key={index}>
-                                                    <TableCell className="px-5 py-4 text-sm text-gray-700 dark:text-white">{row.rowIndex}</TableCell>
-                                                    <TableCell className="px-5 py-4 text-sm text-red-600 dark:text-red-400">{row.error}</TableCell>
-                                                    <TableCell className="px-5 py-4 text-sm text-gray-700 dark:text-white">
-                                                        <pre className="whitespace-pre-wrap text-xs">{JSON.stringify(row.row, null, 2)}</pre>
-                                                    </TableCell>
-                                                </TableRow>
-                                            ))}
-                                        </TableBody>
-                                    </Table>
+
+                                {/* Detailed Statistics */}
+                                <div className="mt-3 grid grid-cols-1 md:grid-cols-4 gap-4 text-sm">
+                                    {operationResult[tableName]!.total_rows && (
+                                        <div className="bg-white dark:bg-gray-700 p-3 rounded border">
+                                            <span className="font-medium text-gray-600 dark:text-gray-300">Total Rows:</span>
+                                            <span className="ml-2 text-lg font-bold text-blue-600 dark:text-blue-400">
+                                                {operationResult[tableName]!.total_rows}
+                                            </span>
+                                        </div>
+                                    )}
+
+                                    {operationResult[tableName]!.inserted_rows !== undefined && (
+                                        <div className="bg-white dark:bg-gray-700 p-3 rounded border">
+                                            <span className="font-medium text-gray-600 dark:text-gray-300">Successful:</span>
+                                            <span className="ml-2 text-lg font-bold text-green-600 dark:text-green-400">
+                                                {operationResult[tableName]!.inserted_rows}
+                                            </span>
+                                        </div>
+                                    )}
+
+                                    {operationResult[tableName]!.failed_rows && (
+                                        <div className="bg-white dark:bg-gray-700 p-3 rounded border">
+                                            <span className="font-medium text-gray-600 dark:text-gray-300">Failed:</span>
+                                            <span className="ml-2 text-lg font-bold text-red-600 dark:text-red-400">
+                                                {operationResult[tableName]!.failed_rows!.length}
+                                            </span>
+                                        </div>
+                                    )}
+
+                                    {operationResult[tableName]!.deletedCount !== undefined && operationResult[tableName]!.deletedCount! > 0 && (
+                                        <div className="bg-white dark:bg-gray-700 p-3 rounded border">
+                                            <span className="font-medium text-gray-600 dark:text-gray-300">Deleted:</span>
+                                            <span className="ml-2 text-lg font-bold text-yellow-600 dark:text-yellow-400">
+                                                {operationResult[tableName]!.deletedCount}
+                                            </span>
+                                        </div>
+                                    )}
                                 </div>
-                            )}
-                            {operationResult[tableName]!.columnNames && operationResult[tableName]!.columnNames!.length > 0 && (
-                                <div>
-                                    <h4 className="font-medium text-gray-700 dark:text-white">CSV Columns Found:</h4>
-                                    <div className="bg-gray-100 dark:bg-gray-700 p-3 rounded-lg mt-2">
-                                        <code className="text-xs text-gray-700 dark:text-white">{operationResult[tableName]!.columnNames!.join(", ")}</code>
+                            </div>
+
+                            {/* Failed Rows Detail Section */}
+                            {operationResult[tableName]!.failed_rows && operationResult[tableName]!.failed_rows!.length > 0 && (
+                                <div className="border border-red-200 dark:border-red-800 rounded-lg overflow-hidden">
+                                    <div className="bg-red-50 dark:bg-red-900/20 px-4 py-3 border-b border-red-200 dark:border-red-800">
+                                        <h4 className="font-semibold text-red-800 dark:text-red-300 flex items-center gap-2">
+                                            <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
+                                                <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
+                                            </svg>
+                                            Failed Rows ({operationResult[tableName]!.failed_rows!.length} total)
+                                        </h4>
+                                        <p className="text-sm text-red-700 dark:text-red-400 mt-1">
+                                            The following rows could not be processed. Review the errors and fix your CSV file.
+                                        </p>
+                                    </div>
+
+                                    <div className="max-h-96 overflow-y-auto">
+                                        <div className="overflow-x-auto">
+                                            <table className="min-w-full divide-y divide-red-200 dark:divide-red-800">
+                                                <thead className="bg-red-50 dark:bg-red-900/30 sticky top-0">
+                                                    <tr>
+                                                        <th className="px-4 py-3 text-left text-xs font-medium text-red-800 dark:text-red-300 uppercase tracking-wider w-20">
+                                                            Row #
+                                                        </th>
+                                                        <th className="px-4 py-3 text-left text-xs font-medium text-red-800 dark:text-red-300 uppercase tracking-wider w-32">
+                                                            Field
+                                                        </th>
+                                                        <th className="px-4 py-3 text-left text-xs font-medium text-red-800 dark:text-red-300 uppercase tracking-wider">
+                                                            Error Description
+                                                        </th>
+                                                        <th className="px-4 py-3 text-left text-xs font-medium text-red-800 dark:text-red-300 uppercase tracking-wider w-32">
+                                                            Invalid Value
+                                                        </th>
+                                                        <th className="px-4 py-3 text-left text-xs font-medium text-red-800 dark:text-red-300 uppercase tracking-wider">
+                                                            Actions
+                                                        </th>
+                                                    </tr>
+                                                </thead>
+                                                <tbody className="bg-white dark:bg-gray-800 divide-y divide-red-100 dark:divide-red-900">
+                                                    {operationResult[tableName]!.failed_rows!.map((failedRow, index) => {
+                                                        const parsedError = parseErrorMessage(failedRow.error);
+                                                        return (
+                                                            <tr key={index} className="hover:bg-red-25 dark:hover:bg-red-900/10">
+                                                                <td className="px-4 py-3 whitespace-nowrap text-sm font-mono text-red-900 dark:text-red-100">
+                                                                    {failedRow.row_index}
+                                                                </td>
+                                                                <td className="px-4 py-3 whitespace-nowrap text-sm text-red-800 dark:text-red-200">
+                                                                    {parsedError.field && (
+                                                                        <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-red-100 dark:bg-red-800 text-red-800 dark:text-red-200">
+                                                                            {parsedError.field}
+                                                                        </span>
+                                                                    )}
+                                                                </td>
+                                                                <td className="px-4 py-3 text-sm text-red-800 dark:text-red-200">
+                                                                    <div className="max-w-md">
+                                                                        <p className="break-words">{parsedError.message}</p>
+                                                                    </div>
+                                                                </td>
+                                                                <td className="px-4 py-3 text-sm text-gray-700 dark:text-gray-300">
+                                                                    {parsedError.value && (
+                                                                        <code className="px-2 py-1 bg-gray-100 dark:bg-gray-700 rounded text-xs font-mono">
+                                                                            {parsedError.value}
+                                                                        </code>
+                                                                    )}
+                                                                </td>
+                                                                <td className="px-4 py-3 text-sm">
+                                                                    <details className="cursor-pointer">
+                                                                        <summary className="text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300 text-xs">
+                                                                            View raw data
+                                                                        </summary>
+                                                                        <div className="mt-2 p-3 bg-gray-50 dark:bg-gray-700 rounded border max-w-lg overflow-x-auto">
+                                                                            <pre className="text-xs text-gray-800 dark:text-gray-200 whitespace-pre-wrap">
+                                                                                {JSON.stringify(failedRow.row, null, 2)}
+                                                                            </pre>
+                                                                        </div>
+                                                                    </details>
+                                                                </td>
+                                                            </tr>
+                                                        );
+                                                    })}
+                                                </tbody>
+                                            </table>
+                                        </div>
                                     </div>
                                 </div>
                             )}
-                            <div className="p-4 border border-blue-200 bg-blue-50 dark:border-blue-900 dark:bg-blue-900/10 rounded-lg">
-                                <h4 className="font-medium text-blue-800 dark:text-blue-300">Troubleshooting Tips:</h4>
-                                <ul className="list-disc ml-5 mt-2 text-sm text-blue-700 dark:text-blue-400">
-                                    <li>Ensure your CSV has all required columns with exact spelling</li>
-                                    <li>Check that dates are in the correct format (YYYY-MM-DD for most tables, YYYY-MM-DD HH:MM:SS for tradebook)</li>
-                                    <li>Ensure numeric values don’t contain invalid characters</li>
-                                    <li>Verify that required fields are not empty</li>
-                                    <li>Ensure CSV dates are within the selected date range if provided</li>
-                                </ul>
+
+                            {/* Export Failed Rows Button */}
+                            {operationResult[tableName]!.failed_rows && operationResult[tableName]!.failed_rows!.length > 0 && (
+                                <div className="flex justify-end">
+                                    <button
+                                        onClick={() => exportFailedRows(tableName)}
+                                        className="px-4 py-2 text-sm font-medium text-white bg-red-600 rounded-lg hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-offset-2"
+                                    >
+                                        Export Failed Rows to Excel ({operationResult[tableName]!.failed_rows!.length} rows)
+                                    </button>
+                                </div>
+                            )}
+
+                            {/* CSV Columns Section */}
+                            {operationResult[tableName]!.column_names && operationResult[tableName]!.column_names!.length > 0 && (
+                                <div className="border border-blue-200 dark:border-blue-800 rounded-lg p-4">
+                                    <h4 className="font-medium text-blue-800 dark:text-blue-300 mb-2 flex items-center gap-2">
+                                        <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
+                                            <path fillRule="evenodd" d="M3 4a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm0 4a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm0 4a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm0 4a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1z" clipRule="evenodd" />
+                                        </svg>
+                                        CSV Columns Detected ({operationResult[tableName]!.column_names!.length})
+                                    </h4>
+                                    <div className="bg-blue-50 dark:bg-blue-900/20 p-3 rounded-lg border border-blue-200 dark:border-blue-800">
+                                        <div className="flex flex-wrap gap-2">
+                                            {operationResult[tableName]!.column_names!.map((column, index) => (
+                                                <span
+                                                    key={index}
+                                                    className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 dark:bg-blue-800 text-blue-800 dark:text-blue-200"
+                                                >
+                                                    {column}
+                                                </span>
+                                            ))}
+                                        </div>
+                                    </div>
+                                </div>
+                            )}
+
+                            {/* Troubleshooting Section */}
+                            <div className="border border-amber-200 dark:border-amber-800 rounded-lg p-4 bg-amber-50 dark:bg-amber-900/20">
+                                <h4 className="font-medium text-amber-800 dark:text-amber-300 mb-2 flex items-center gap-2">
+                                    <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
+                                        <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clipRule="evenodd" />
+                                    </svg>
+                                    Common Issues & Solutions
+                                </h4>
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-3 text-sm text-amber-700 dark:text-amber-400">
+                                    <div>
+                                        <h5 className="font-medium mb-1">Data Format Issues:</h5>
+                                        <ul className="list-disc ml-4 space-y-1">
+                                            <li>Remove "%" symbols from percentage fields</li>
+                                            <li>Replace "#DIV/0!" or "N/A" with empty cells or 0</li>
+                                            <li>Replace "-" in numeric fields with 0 or empty</li>
+                                            <li>Use YYYY-MM-DD format for dates</li>
+                                        </ul>
+                                    </div>
+                                    <div>
+                                        <h5 className="font-medium mb-1">Validation Issues:</h5>
+                                        <ul className="list-disc ml-4 space-y-1">
+                                            <li>Ensure all required fields are filled</li>
+                                            <li>Check numeric fields don't contain text</li>
+                                            <li>Verify date ranges are valid</li>
+                                            <li>Remove extra spaces and special characters</li>
+                                        </ul>
+                                    </div>
+                                </div>
                             </div>
                         </div>
                     </div>
