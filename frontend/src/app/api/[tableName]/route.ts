@@ -116,6 +116,21 @@ const columnToFieldMap: Record<string, Record<string, string>> = {
     'sub category': 'sub_category',
     'status': 'status',
   },
+  equity_holding: {
+    'symbol': 'symbol',
+    'mastersheet tag': 'mastersheet_tag',
+    'exchange': 'exchange',
+    'quantity': 'quantity',
+    'avg price': 'avg_price',
+    'broker': 'broker',
+    'debt/equity': 'debt_equity',
+    'sub category': 'sub_category',
+    'ltp': 'ltp',
+    'buy value': 'buy_value',
+    'value as of today': 'value_as_of_today',
+    'pnl amount': 'pnl_amount',
+    '% pnl': 'percent_pnl',
+  },
 };
 
 export async function GET(req: NextRequest, { params }: { params: Promise<{ tableName: string }> }) {

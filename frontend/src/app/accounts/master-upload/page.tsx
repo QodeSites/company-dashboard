@@ -56,7 +56,7 @@ export default function MasterUploadPage() {
     master_sheet: null,
   });
   const [uploadProgress, setUploadProgress] = useState<Record<string, number>>({
-    master_sheet: 0, tradebook: 0, slippage: 0, mutual_fund_holding: 0, gold_tradebook: 0, liquidbees_tradebook: 0,
+    master_sheet: 0, tradebook: 0, slippage: 0, mutual_fund_holding: 0, gold_tradebook: 0, liquidbees_tradebook: 0, equity_holding: 0
   });
   const [filterEndDate, setFilterEndDate] = useState<{ master_sheet: string | null }>({ master_sheet: null });
   const fileInputRefs = {

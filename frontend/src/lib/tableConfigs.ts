@@ -48,4 +48,13 @@ export const tableConfigs: Record<string, { requiredColumns: string[]; dateField
     dateField: 'date',
     model: 'liquidbees_tradebook',
   },
+  equity_holding: {
+    requiredColumns: [
+      'Symbol', 'Mastersheet Tag', 'Exchange', 'Quantity', 'Avg Price',
+      'Broker', 'Debt/Equity', 'Sub Category', 'LTP', 'Buy Value',
+      'Value as of Today', 'PNL Amount', '% PNL',
+    ],
+    dateField: 'date', // Adjust this if equity holdings has a different date field
+    model: 'equity_holding',
+  },
 };

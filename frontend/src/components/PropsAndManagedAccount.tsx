@@ -52,15 +52,20 @@ interface PropsAndManagedAccountProps {
     qcode: string;
 }
 
+// helper (optional)
+const toSlug = (k: string) => k.replace(/_/g, "-");
+
+// when creating tableConfigs
 const tableConfigs = Object.entries(sharedTableConfigs).reduce((acc, [key, value]) => {
     acc[key] = {
         requiredColumns: value.requiredColumns,
         dateField: value.dateField,
-        endpoint: `${API_BASE}/api/upload/master-sheet/`,
+        endpoint: `${API_BASE}/api/upload/${toSlug(key)}/`, // <-- underscore → hyphen
         displayName: value.displayName,
     };
     return acc;
 }, {} as Record<string, TableConfig>);
+
 
 export default function PropsAndManagedAccount({ qcode }: PropsAndManagedAccountProps) {
     const [activeTab, setActiveTab] = useState("master_sheet");
@@ -69,52 +74,52 @@ export default function PropsAndManagedAccount({ qcode }: PropsAndManagedAccount
     });
     const [chartData, setChartData] = useState<Row[]>([]);
     const [totals, setTotals] = useState<Record<string, number>>({
-        master_sheet: 0, tradebook: 0, slippage: 0, mutual_fund_holding: 0, gold_tradebook: 0, liquidbees_tradebook: 0,
+        master_sheet: 0, tradebook: 0, slippage: 0, mutual_fund_holding: 0, gold_tradebook: 0, liquidbees_tradebook: 0, equity_holding: 0,
     });
     const [page, setPage] = useState<Record<string, number>>({
-        master_sheet: 1, tradebook: 1, slippage: 1, mutual_fund_holding: 1, gold_tradebook: 1, liquidbees_tradebook: 1,
+        master_sheet: 1, tradebook: 1, slippage: 1, mutual_fund_holding: 1, gold_tradebook: 1, liquidbees_tradebook: 1, equity_holding: 1,
     });
     const [pageSize, setPageSize] = useState(25);
     const [search, setSearch] = useState<Record<string, string>>({
-        master_sheet: "", tradebook: "", slippage: "", mutual_fund_holding: "", gold_tradebook: "", liquidbees_tradebook: "",
+        master_sheet: "", tradebook: "", slippage: "", mutual_fund_holding: "", gold_tradebook: "", liquidbees_tradebook: "", equity_holding: "",
     });
     const [filterStartDate, setFilterStartDate] = useState<Record<string, string | null>>({
-        master_sheet: null, tradebook: null, slippage: null, mutual_fund_holding: null, gold_tradebook: null, liquidbees_tradebook: null,
+        master_sheet: null, tradebook: null, slippage: null, mutual_fund_holding: null, gold_tradebook: null, liquidbees_tradebook: null, equity_holding: null,
     });
     const [filterEndDate, setFilterEndDate] = useState<Record<string, string | null>>({
-        master_sheet: null, tradebook: null, slippage: null, mutual_fund_holding: null, gold_tradebook: null, liquidbees_tradebook: null,
+        master_sheet: null, tradebook: null, slippage: null, mutual_fund_holding: null, gold_tradebook: null, liquidbees_tradebook: null, equity_holding: null,
     });
     const [isLoading, setIsLoading] = useState<Record<string, boolean>>({
-        master_sheet: false, tradebook: false, slippage: false, mutual_fund_holding: false, gold_tradebook: false, liquidbees_tradebook: false,
+        master_sheet: false, tradebook: false, slippage: false, mutual_fund_holding: false, gold_tradebook: false, liquidbees_tradebook: false, equity_holding: false,
     });
     const [isChartLoading, setIsChartLoading] = useState(false);
     const [files, setFiles] = useState<Record<string, File | null>>({
-        master_sheet: null, tradebook: null, slippage: null, mutual_fund_holding: null, gold_tradebook: null, liquidbees_tradebook: null,
+        master_sheet: null, tradebook: null, slippage: null, mutual_fund_holding: null, gold_tradebook: null, liquidbees_tradebook: null, equity_holding: null,
     });
     const [uploadProgress, setUploadProgress] = useState<Record<string, number>>({
-        master_sheet: 0, tradebook: 0, slippage: 0, mutual_fund_holding: 0, gold_tradebook: 0, liquidbees_tradebook: 0,
+        master_sheet: 0, tradebook: 0, slippage: 0, mutual_fund_holding: 0, gold_tradebook: 0, liquidbees_tradebook: 0, equity_holding: 0,
     });
     const [isUploading, setIsUploading] = useState<Record<string, boolean>>({
         master_sheet: false, tradebook: false, slippage: false, mutual_fund_holding: false, gold_tradebook: false, liquidbees_tradebook: false,
     });
     const [isProcessing, setIsProcessing] = useState<Record<string, boolean>>({
-        master_sheet: false, tradebook: false, slippage: false, mutual_fund_holding: false, gold_tradebook: false, liquidbees_tradebook: false,
+        master_sheet: false, tradebook: false, slippage: false, mutual_fund_holding: false, gold_tradebook: false, liquidbees_tradebook: false, equity_holding: false,
     });
     const [isDeleting, setIsDeleting] = useState<Record<string, boolean>>({
-        master_sheet: false, tradebook: false, slippage: false, mutual_fund_holding: false, gold_tradebook: false, liquidbees_tradebook: false,
+        master_sheet: false, tradebook: false, slippage: false, mutual_fund_holding: false, gold_tradebook: false, liquidbees_tradebook: false, equity_holding: false,
     });
     const [operationType, setOperationType] = useState<"upload" | "combined" | "replace" | "delete" | null>(null);
     const [operationResult, setOperationResult] = useState<Record<string, UploadResponse | null>>({
-        master_sheet: null, tradebook: null, slippage: null, mutual_fund_holding: null, gold_tradebook: null, liquidbees_tradebook: null,
+        master_sheet: null, tradebook: null, slippage: null, mutual_fund_holding: null, gold_tradebook: null, liquidbees_tradebook: null, equity_holding: null,
     });
     const [csvPreviews, setCsvPreviews] = useState<Record<string, string[]>>({
-        master_sheet: [], tradebook: [], slippage: [], mutual_fund_holding: [], gold_tradebook: [], liquidbees_tradebook: [],
+        master_sheet: [], tradebook: [], slippage: [], mutual_fund_holding: [], gold_tradebook: [], liquidbees_tradebook: [], equity_holding: [],
     });
     const [sortConfig, setSortConfig] = useState<Record<string, { key: string; direction: "asc" | "desc" } | null>>({
-        master_sheet: null, tradebook: null, slippage: null, mutual_fund_holding: null, gold_tradebook: null, liquidbees_tradebook: null,
+        master_sheet: null, tradebook: null, slippage: null, mutual_fund_holding: null, gold_tradebook: null, liquidbees_tradebook: null, equity_holding: null,
     });
     const [isUploadOpen, setIsUploadOpen] = useState<Record<string, boolean>>({
-        master_sheet: false, tradebook: false, slippage: false, mutual_fund_holding: false, gold_tradebook: false, liquidbees_tradebook: false,
+        master_sheet: false, tradebook: false, slippage: false, mutual_fund_holding: false, gold_tradebook: false, liquidbees_tradebook: false, equity_holding: false,
     });
     const fileInputRefs = {
         master_sheet: useRef<HTMLInputElement>(null),
@@ -123,7 +128,12 @@ export default function PropsAndManagedAccount({ qcode }: PropsAndManagedAccount
         mutual_fund_holding: useRef<HTMLInputElement>(null),
         gold_tradebook: useRef<HTMLInputElement>(null),
         liquidbees_tradebook: useRef<HTMLInputElement>(null),
+        equity_holding: useRef<HTMLInputElement>(null),
     };
+
+    const [accountDetails, setAccountDetails] = useState<any>(null);
+    const [isEditing, setIsEditing] = useState(false);
+    const [editForm, setEditForm] = useState<any>({});
 
     const formatDisplayDate = (dateStr: string, tableName: string): string => {
         const date = new Date(dateStr);
@@ -142,6 +152,41 @@ export default function PropsAndManagedAccount({ qcode }: PropsAndManagedAccount
         const month = String(date.getMonth() + 1).padStart(2, "0");
         const year = date.getFullYear();
         return `${day}-${month}-${year}`;
+    };
+
+    const fetchAccountDetails = async () => {
+        try {
+            const res = await fetch(`/api/accounts?qcode=${qcode}`);
+            if (!res.ok) throw new Error("Failed to fetch account details");
+            const { account } = await res.json();
+            setAccountDetails(account);
+            setEditForm(account);
+        } catch (error) {
+            console.error("Error fetching account details:", error);
+            alert("Failed to load account details. Please try again.");
+        }
+    };
+
+    const handleUpdate = async (e: React.FormEvent) => {
+        e.preventDefault();
+        try {
+            const res = await fetch("/api/accounts", {
+                method: "PUT",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ qcode, ...editForm }),
+            });
+            if (!res.ok) throw new Error("Failed to update account");
+            setIsEditing(false);
+            fetchAccountDetails();
+            alert("Account updated successfully!");
+        } catch (error) {
+            console.error("Error updating account:", error);
+            alert("Failed to update account. Please try again.");
+        }
+    };
+
+    const handleEditChange = (field: string, value: any) => {
+        setEditForm((prev: any) => ({ ...prev, [field]: value }));
     };
 
     const fetchTableData = async (tableName: string) => {
@@ -681,8 +726,6 @@ export default function PropsAndManagedAccount({ qcode }: PropsAndManagedAccount
     };
 
     const isOperationInProgress = Object.values(isUploading).some((v) => v) || Object.values(isProcessing).some((v) => v) || Object.values(isDeleting).some((v) => v);
-
-
     // Add this utility function to parse error messages better
     const parseErrorMessage = (error: string): { message: string; field?: string; value?: string } => {
         // Handle Pydantic validation errors
@@ -742,6 +785,7 @@ export default function PropsAndManagedAccount({ qcode }: PropsAndManagedAccount
     useEffect(() => {
         fetchTableData("master_sheet");
         fetchChartData();
+        fetchAccountDetails();
     }, [qcode, page.master_sheet, search.master_sheet, filterStartDate.master_sheet, filterEndDate.master_sheet, pageSize]);
 
     useEffect(() => {
@@ -763,6 +807,11 @@ export default function PropsAndManagedAccount({ qcode }: PropsAndManagedAccount
     useEffect(() => {
         fetchTableData("liquidbees_tradebook");
     }, [qcode, page.liquidbees_tradebook, search.liquidbees_tradebook, filterStartDate.liquidbees_tradebook, filterEndDate.liquidbees_tradebook, pageSize]);
+
+    useEffect(() => {
+        fetchTableData("equity_holding");
+    }, [qcode, page.equity_holding, search.equity_holding, filterStartDate.equity_holding, filterEndDate.equity_holding, pageSize]);
+
 
     const tabs = Object.keys(tableConfigs).map((tableName) => ({
         name: tableConfigs[tableName].displayName,
@@ -1243,6 +1292,206 @@ export default function PropsAndManagedAccount({ qcode }: PropsAndManagedAccount
     }));
 
     return (
-        <DefaultTab defaultTab="Master Sheet" tabs={tabs} />
+        <>
+            <div className="bg-white dark:bg-gray-800 p-6 rounded-lg shadow-sm border border-gray-200 dark:border-gray-800 mb-6">
+                <div className="flex justify-between items-center mb-4">
+                    <h2 className="text-xl font-bold text-gray-800 dark:text-white">Account Details - {qcode}</h2>
+                    <button
+                        onClick={() => setIsEditing(!isEditing)}
+                        className="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
+                    >
+                        {isEditing ? "Cancel" : "Edit"}
+                    </button>
+                </div>
+                {accountDetails ? (
+                    isEditing ? (
+                        <form onSubmit={handleUpdate} className="space-y-4">
+                            <div>
+                                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                                    Account Name
+                                </label>
+                                <InputField
+                                    value={editForm.account_name || ""}
+                                    onChange={(e) => handleEditChange("account_name", e.target.value)}
+                                />
+                            </div>
+
+                            <div>
+                                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                                    Broker
+                                </label>
+                                <InputField
+                                    value={editForm.broker || ""}
+                                    onChange={(e) => handleEditChange("broker", e.target.value)}
+                                />
+                            </div>
+
+                            <div>
+                                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                                    Account Type
+                                </label>
+                                <InputField
+                                    value={editForm.account_type || ""}
+                                    onChange={(e) => handleEditChange("account_type", e.target.value)}
+                                />
+                            </div>
+
+                            <div>
+                                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                                    Email Linked
+                                </label>
+                                <InputField
+                                    value={editForm.email_linked || ""}
+                                    onChange={(e) => handleEditChange("email_linked", e.target.value)}
+                                />
+                            </div>
+
+                            <div>
+                                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                                    Contact Number
+                                </label>
+                                <InputField
+                                    value={editForm.contact_number || ""}
+                                    onChange={(e) => handleEditChange("contact_number", e.target.value)}
+                                />
+                            </div>
+
+                            <div>
+                                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                                    Login ID
+                                </label>
+                                <InputField
+                                    value={editForm.login_id || ""}
+                                    onChange={(e) => handleEditChange("login_id", e.target.value)}
+                                />
+                            </div>
+
+                            <div>
+                                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                                    Login Password
+                                </label>
+                                <InputField
+                                    type="password"
+                                    value={editForm.login_password || ""}
+                                    onChange={(e) => handleEditChange("login_password", e.target.value)}
+                                />
+                            </div>
+
+                            <div>
+                                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                                    TOTP Secret
+                                </label>
+                                <InputField
+                                    value={editForm.totp_secret || ""}
+                                    onChange={(e) => handleEditChange("totp_secret", e.target.value)}
+                                />
+                            </div>
+
+                            <div>
+                                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                                    Aadhar
+                                </label>
+                                <InputField
+                                    value={editForm.aadhar || ""}
+                                    onChange={(e) => handleEditChange("aadhar", e.target.value)}
+                                />
+                            </div>
+
+                            <div>
+                                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                                    PAN
+                                </label>
+                                <InputField
+                                    value={editForm.pan || ""}
+                                    onChange={(e) => handleEditChange("pan", e.target.value)}
+                                />
+                            </div>
+
+                            <div>
+                                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                                    Remarks
+                                </label>
+                                <InputField
+                                    value={editForm.remarks || ""}
+                                    onChange={(e) => handleEditChange("remarks", e.target.value)}
+                                />
+                            </div>
+
+                            <div>
+                                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                                    API Details (JSON)
+                                </label>
+                                <textarea
+                                    value={JSON.stringify(editForm.api_details || {}, null, 2)}
+                                    onChange={(e) => {
+                                        try {
+                                            handleEditChange("api_details", JSON.parse(e.target.value));
+                                        } catch (err) {
+                                            console.error("Invalid JSON for api_details");
+                                        }
+                                    }}
+                                    className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-brand-500 focus:ring-brand-500 sm:text-sm dark:bg-gray-700 dark:border-gray-600 dark:text-white"
+                                    rows={6}
+                                />
+                            </div>
+
+                            <div>
+                                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                                    Nominees (JSON Array)
+                                </label>
+                                <textarea
+                                    value={JSON.stringify(editForm.nominees || [], null, 2)}
+                                    onChange={(e) => {
+                                        try {
+                                            handleEditChange("nominees", JSON.parse(e.target.value));
+                                        } catch (err) {
+                                            console.error("Invalid JSON for nominees");
+                                        }
+                                    }}
+                                    className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-brand-500 focus:ring-brand-500 sm:text-sm dark:bg-gray-700 dark:border-gray-600 dark:text-white"
+                                    rows={4}
+                                />
+                            </div>
+
+                            <button
+                                type="submit"
+                                className="px-6 py-2 text-sm font-medium text-white bg-green-600 rounded-lg hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-offset-2"
+                            >
+                                Save Changes
+                            </button>
+                        </form>
+                    ) : (
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm text-gray-700 dark:text-gray-300">
+                            <div><strong>Account Name:</strong> {accountDetails.account_name}</div>
+                            <div><strong>Broker:</strong> {accountDetails.broker}</div>
+                            <div><strong>Account Type:</strong> {accountDetails.account_type}</div>
+                            <div><strong>Email Linked:</strong> {accountDetails.email_linked}</div>
+                            <div><strong>Contact Number:</strong> {accountDetails.contact_number}</div>
+                            <div><strong>Login ID:</strong> {accountDetails.login_id}</div>
+                            <div><strong>TOTP Secret:</strong> {accountDetails.totp_secret}</div>
+                            <div><strong>Aadhar:</strong> {accountDetails.aadhar}</div>
+                            <div><strong>PAN:</strong> {accountDetails.pan}</div>
+                            <div><strong>Remarks:</strong> {accountDetails.remarks}</div>
+                            {accountDetails.account_type === "pms" && accountDetails.account_custodian_codes && (
+                                <div className="col-span-2">
+                                    <strong>Custodian Codes:</strong>
+                                    <ul className="list-disc ml-4">
+                                        {accountDetails.account_custodian_codes.map((code: any, idx: number) => (
+                                            <li key={idx}>{code.custodian_code}</li>
+                                        ))}
+                                    </ul>
+                                </div>
+                            )}
+                            {/* Add more display fields as needed, e.g., nominees, api_details */}
+                        </div>
+                    )
+                ) : (
+                    <div className="flex justify-center items-center h-32">
+                        <Spinner />
+                    </div>
+                )}
+            </div>
+            <DefaultTab defaultTab="Master Sheet" tabs={tabs} />
+        </>
     );
 }

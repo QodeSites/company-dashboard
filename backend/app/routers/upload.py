@@ -354,3 +354,13 @@ async def replace_master_sheet_route(
     db: Prisma = Depends(get_db)
 ):
     return await replace_master_sheet(file, qcode, db)
+
+@router.post("/upload/equity-holding/")
+async def upload_equity_holding(
+    file: UploadFile = File(...),
+    qcode: str = Form(...),
+    startDate: Optional[str] = Form(None),
+    endDate: Optional[str] = Form(None),
+    db: Prisma = Depends(get_db)
+):
+    return await upload_csv(file, qcode, startDate, endDate, db, "equity_holding")

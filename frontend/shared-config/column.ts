@@ -112,4 +112,23 @@ export const sharedTableConfigs: Record<string, TableDefinition> = {
       { displayName: "Sub Category", fieldName: "sub_category" },
     ],
   },
+  equity_holding: {
+    displayName: "Equity Holdings",
+    dateField: "date", // If there's a date field, otherwise adjust accordingly
+    requiredColumns: [
+      { fieldName: "symbol", displayName: "Symbol" },
+      { fieldName: "mastersheet_tag", displayName: "Mastersheet Tag" },
+      { fieldName: "exchange", displayName: "Exchange" },
+      { fieldName: "quantity", displayName: "Quantity" },
+      { fieldName: "avg_price", displayName: "Avg Price" },
+      { fieldName: "broker", displayName: "Broker" },
+      { fieldName: "debt_equity", displayName: "Debt/Equity" },
+      { fieldName: "sub_category", displayName: "Sub Category" },
+      { fieldName: "ltp", displayName: "LTP" },
+      { fieldName: "buy_value", displayName: "Buy Value" },
+      { fieldName: "value_as_of_today", displayName: "Value as of Today" },
+      { fieldName: "pnl_amount", displayName: "PNL Amount" },
+      { fieldName: "percent_pnl", displayName: "% PNL" }
+    ]
+  }
 };

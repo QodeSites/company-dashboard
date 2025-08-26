@@ -106,33 +106,6 @@ model clients {
   pooled_account_users       pooled_account_users[]
 }
 
-model equity_holding {
-  id              Int       @id @default(autoincrement())
-  qcode           String    @db.VarChar(20)
-  account         String    @db.VarChar(100)
-  mastersheet_tag String    @db.VarChar(50)
-  date            DateTime  @db.Date
-  trade_type      String    @db.Char(1)
-  symbol          String    @db.VarChar(150)
-  exchange        String    @db.VarChar(10)
-  quantity        Int
-  price           Decimal   @db.Decimal(15, 2)
-  broker          String    @db.VarChar(50)
-  debt_equity     String    @db.Char(6)
-  collateral      String    @db.Char(8)
-  sub_category    String    @db.VarChar(50)
-  exposure        Decimal?  @db.Decimal(15, 2)
-  status          String    @db.VarChar(10)
-  custom_fields   Json?     @db.Json
-  created_at      DateTime? @default(now()) @db.Timestamp(6)
-  updated_at      DateTime? @db.Timestamp(6)
-  updated_by      Int?
-
-  @@index([date], map: "idx_equity_holding_date")
-  @@index([qcode], map: "idx_equity_holding_qcode")
-  @@index([symbol], map: "idx_equity_holding_symbol")
-}
-
 model gold_tradebook {
   id              Int       @id @default(autoincrement())
   qcode           String    @db.VarChar(20)
@@ -336,4 +309,23 @@ model pms_master_sheet {
   period_return_percent     Decimal?  @db.Decimal(10, 4)
   cumulative_return_percent Decimal?  @db.Decimal(10, 4)
   created_at                DateTime? @default(now()) @db.Timestamptz(6)
+}
+
+model equity_holding {
+  qcode             String?   @db.VarChar(50)
+  date              DateTime? @db.Date
+  symbol            String?   @db.VarChar(20)
+  mastersheet_tag   String?   @db.VarChar(100)
+  exchange          String?   @db.VarChar(50)
+  quantity          Int?
+  avg_price         Decimal?  @db.Decimal(10, 2)
+  broker            String?   @db.VarChar(100)
+  debt_equity       String?   @db.VarChar(20)
+  sub_category      String?   @db.VarChar(100)
+  ltp               Decimal?  @db.Decimal(10, 2)
+  buy_value         Decimal?  @db.Decimal(15, 2)
+  value_as_of_today Decimal?  @db.Decimal(15, 2)
+  pnl_amount        Decimal?  @db.Decimal(15, 2)
+  percent_pnl       Decimal?  @db.Decimal(5, 2)
+  id                BigInt    @id
 }

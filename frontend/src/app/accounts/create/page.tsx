@@ -19,11 +19,21 @@ interface User {
   user_name: string;
 }
 
+interface ZerodhaDetails {
+  account_id: string;
+  aadhar: string;
+  pan: string;
+  email: string;
+  phone: string;
+  password: string;
+}
+
 interface FormData {
   account_name: string;
   broker: string;
   account_type: string;
   custodian_codes: string[];
+  zerodha_details?: ZerodhaDetails;
 }
 
 export default function CreateAccountPage() {
@@ -61,6 +71,17 @@ export default function CreateAccountPage() {
     }));
   };
 
+  const handleZerodhaDetailsChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const { name, value } = e.target;
+    setFormData((prev) => ({
+      ...prev,
+      zerodha_details: {
+        ...prev.zerodha_details,
+        [name]: value,
+      } as ZerodhaDetails,
+    }));
+  };
+
   const handleCustodianCodeChange = (idx: number, value: string) => {
     const codes = [...formData.custodian_codes];
     codes[idx] = value;
@@ -80,6 +101,7 @@ export default function CreateAccountPage() {
       account_type: value,
       broker: "",
       custodian_codes: value === "pms" ? [""] : [],
+      zerodha_details: undefined, // Reset Zerodha details when account type changes
     }));
   };
 
@@ -87,6 +109,18 @@ export default function CreateAccountPage() {
     setFormData((prev) => ({
       ...prev,
       broker: value,
+      // Initialize zerodha_details if Managed Account + Zerodha
+      zerodha_details: 
+        prev.account_type === "managed_account" && value === "zerodha"
+          ? {
+              account_id: "",
+              aadhar: "",
+              pan: "",
+              email: "",
+              phone: "",
+              password: "",
+            }
+          : prev.zerodha_details,
     }));
   };
 
@@ -101,130 +135,125 @@ export default function CreateAccountPage() {
   };
 
   const validateForm = (): boolean => {
-  if (!formData.account_name) {
-    alert("Account Name is required.");
-    return false;
-  }
-  if (!formData.account_type) {
-    alert("Account Type is required.");
-    return false;
-  }
-  if (!formData.broker) {
-    alert("Broker is required.");
-    return false;
-  }
-  if (formData.account_type === "pms") {
-    const validCodes = formData.custodian_codes.filter(code => typeof code === "string" && code.trim() !== "");
-    if (validCodes.length === 0) {
-      alert("At least one valid, non-empty custodian code is required for PMS accounts.");
+    if (!formData.account_name) {
+      alert("Account Name is required.");
       return false;
     }
-  }
-  for (const [index, user] of users.entries()) {
-    console.log(`Validating user ${index + 1}:`, user);
-    if (!user.icode) {
-      alert(`User selection is required for allocation ${index + 1}.`);
+    if (!formData.account_type) {
+      alert("Account Type is required.");
       return false;
     }
-    // if (!user.date) {
-    //   alert(`Date is required for allocation ${index + 1}.`);
-    //   return false;
-    // }
-  }
-  return true;
-};
-
-const handleSubmit = async (e: React.FormEvent) => {
-  e.preventDefault();
-
-  if (!validateForm()) return;
-
-  // Trim and filter custodian codes before submission
-  const trimmedCustodianCodes = formData.account_type === "pms"
-    ? formData.custodian_codes.map(code => code.trim()).filter(code => code !== "")
-    : formData.custodian_codes;
-  
-  const payload = { 
-    ...formData, 
-    custodian_codes: trimmedCustodianCodes,
-    user_allocations: users 
-  };
-  console.log("Submitting payload:", payload); // Debug log
-
-  setIsSubmitting(true);
-
-  try {
-    const response = await fetch("/api/accounts", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(payload),
-    });
-
-    if (!response.ok) {
-      const text = await response.text();
-      let errorData;
-      try {
-        errorData = JSON.parse(text);
-      } catch {
-        throw new Error(`Server returned non-JSON response: ${text.slice(0, 100)}...`);
+    if (!formData.broker) {
+      alert("Broker is required.");
+      return false;
+    }
+    if (formData.account_type === "pms") {
+      const validCodes = formData.custodian_codes.filter(code => typeof code === "string" && code.trim() !== "");
+      if (validCodes.length === 0) {
+        alert("At least one valid, non-empty custodian code is required for PMS accounts.");
+        return false;
       }
-      throw new Error(errorData.message || `Request failed with status ${response.status}`);
+    }
+    
+    // Validate Zerodha details for Managed Account + Zerodha combination
+    if (formData.account_type === "managed_account" && formData.broker === "zerodha") {
+      const zerodha = formData.zerodha_details;
+      if (!zerodha?.account_id) {
+        alert("Zerodha Account ID is required.");
+        return false;
+      }
+      if (!zerodha?.aadhar) {
+        alert("Aadhar number is required.");
+        return false;
+      }
+      if (!zerodha?.pan) {
+        alert("PAN number is required.");
+        return false;
+      }
+      if (!zerodha?.email) {
+        alert("Email linked to Zerodha is required.");
+        return false;
+      }
+      if (!zerodha?.phone) {
+        alert("Phone number linked to Zerodha is required.");
+        return false;
+      }
+      // if (!zerodha?.password) {
+      //   alert("Zerodha Account Password is required.");
+      //   return false;
+      // }
     }
 
-    const result = await response.json();
-    alert(`✅ Account Created Successfully! New Code: ${result.account.qcode}`);
+    for (const [index, user] of users.entries()) {
+      console.log(`Validating user ${index + 1}:`, user);
+      if (!user.icode) {
+        alert(`User selection is required for allocation ${index + 1}.`);
+        return false;
+      }
+      // if (!user.date) {
+      //   alert(`Date is required for allocation ${index + 1}.`);
+      //   return false;
+      // }
+    }
+    return true;
+  };
 
-    setFormData({ account_name: "", broker: "", account_type: "", custodian_codes: [""] });
-    setUsers([{ icode: "", date: "" }]);
-  } catch (error: unknown) {
-    console.error("Error creating account:", error);
-    const errorMessage = error instanceof Error ? error.message : "An unexpected error occurred";
-    alert(`❌ Error creating account: ${errorMessage}`);
-  } finally {
-    setIsSubmitting(false);
-  }
-};
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
 
-  // const handleSubmit = async (e: React.FormEvent) => {
-  //   e.preventDefault();
+    if (!validateForm()) return;
 
-  //   if (!validateForm()) return;
+    // Trim and filter custodian codes before submission
+    const trimmedCustodianCodes = formData.account_type === "pms"
+      ? formData.custodian_codes.map(code => code.trim()).filter(code => code !== "")
+      : formData.custodian_codes;
+    
+    const payload = { 
+      ...formData, 
+      custodian_codes: trimmedCustodianCodes,
+      user_allocations: users 
+    };
+    console.log("Submitting payload:", payload); // Debug log
 
-  //   setIsSubmitting(true);
+    setIsSubmitting(true);
 
-  //   const payload = { ...formData, user_allocations: users };
+    try {
+      const response = await fetch("/api/accounts", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
 
-  //   try {
-  //     const response = await fetch("/api/accounts", {
-  //       method: "POST",
-  //       headers: { "Content-Type": "application/json" },
-  //       body: JSON.stringify(payload),
-  //     });
+      if (!response.ok) {
+        const text = await response.text();
+        let errorData;
+        try {
+          errorData = JSON.parse(text);
+        } catch {
+          throw new Error(`Server returned non-JSON response: ${text.slice(0, 100)}...`);
+        }
+        throw new Error(errorData.message || `Request failed with status ${response.status}`);
+      }
 
-  //     if (!response.ok) {
-  //       const text = await response.text();
-  //       let errorData;
-  //       try {
-  //         errorData = JSON.parse(text);
-  //       } catch {
-  //         throw new Error(`Server returned non-JSON response: ${text.slice(0, 100)}...`);
-  //       }
-  //       throw new Error(errorData.message || `Request failed with status ${response.status}`);
-  //     }
+      const result = await response.json();
+      alert(`✅ Account Created Successfully! New Code: ${result.account.qcode}`);
 
-  //     const result = await response.json();
-  //     alert(`✅ Account Created Successfully! New Code: ${result.account.qcode}`);
-
-  //     setFormData({ account_name: "", broker: "", account_type: "", custodian_codes: [""] });
-  //     setUsers([{ icode: "", date: "" }]);
-  //   } catch (error: unknown) {
-  //     console.error("Error creating account:", error);
-  //     const errorMessage = error instanceof Error ? error.message : "An unexpected error occurred";
-  //     alert(`❌ Error creating account: ${errorMessage}`);
-  //   } finally {
-  //     setIsSubmitting(false);
-  //   }
-  // };
+      setFormData({ 
+        account_name: "", 
+        broker: "", 
+        account_type: "", 
+        custodian_codes: [""],
+        zerodha_details: undefined,
+      });
+      setUsers([{ icode: "", date: "" }]);
+    } catch (error: unknown) {
+      console.error("Error creating account:", error);
+      const errorMessage = error instanceof Error ? error.message : "An unexpected error occurred";
+      alert(`❌ Error creating account: ${errorMessage}`);
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
 
   const brokerOptions =
     formData.account_type === "pms"
@@ -240,6 +269,9 @@ const handleSubmit = async (e: React.FormEvent) => {
           { value: "sre", label: "SRE" },
         ]
         : [];
+
+  // Check if we should show Zerodha additional fields
+  const showZerodhaFields = formData.account_type === "managed_account" && formData.broker === "zerodha";
 
   return (
     <ComponentCard title="Create New Account">
@@ -308,6 +340,85 @@ const handleSubmit = async (e: React.FormEvent) => {
           </div>
         )}
 
+        {/* Zerodha Additional Fields for Managed Account + Zerodha */}
+        {showZerodhaFields && (
+          <div className="space-y-4 border-2 border-blue-200 p-4 rounded-lg bg-blue-50">
+            <h3 className="font-medium text-blue-800 mb-4">Zerodha Account Details</h3>
+            
+            <div>
+              <Label>Phone Number (Linked to Zerodha)</Label>
+              <InputField
+                type="tel"
+                name="phone"
+                value={formData.zerodha_details?.phone || ""}
+                onChange={handleZerodhaDetailsChange}
+                placeholder="Enter phone number linked to Zerodha account"
+                disabled={isSubmitting}
+              />
+            </div>
+
+            <div>
+              <Label>Zerodha Account ID</Label>
+              <InputField
+                type="text"
+                name="account_id"
+                value={formData.zerodha_details?.account_id || ""}
+                onChange={handleZerodhaDetailsChange}
+                placeholder="Enter Zerodha Account ID"
+                disabled={isSubmitting}
+              />
+            </div>
+
+            <div>
+              <Label>Aadhar Number</Label>
+              <InputField
+                type="text"
+                name="aadhar"
+                value={formData.zerodha_details?.aadhar || ""}
+                onChange={handleZerodhaDetailsChange}
+                placeholder="Enter Aadhar Number"
+                disabled={isSubmitting}
+              />
+            </div>
+
+            <div>
+              <Label>PAN Number</Label>
+              <InputField
+                type="text"
+                name="pan"
+                value={formData.zerodha_details?.pan || ""}
+                onChange={handleZerodhaDetailsChange}
+                placeholder="Enter PAN Number"
+                disabled={isSubmitting}
+              />
+            </div>
+
+            <div>
+              <Label>Email (Linked to Zerodha)</Label>
+              <InputField
+                type="email"
+                name="email"
+                value={formData.zerodha_details?.email || ""}
+                onChange={handleZerodhaDetailsChange}
+                placeholder="Enter email linked to Zerodha account"
+                disabled={isSubmitting}
+              />
+            </div>
+
+            {/* <div>
+              <Label>Zerodha Account Password</Label>
+              <InputField
+                type="password"
+                name="password"
+                value={formData.zerodha_details?.password || ""}
+                onChange={handleZerodhaDetailsChange}
+                placeholder="Enter Zerodha Account Password"
+                disabled={isSubmitting}
+              />
+            </div> */}
+          </div>
+        )}
+
         <div className="space-y-4">
           <Label>Add Users and Allocations</Label>
           {users.map((entry, index) => (
@@ -352,8 +463,6 @@ const handleSubmit = async (e: React.FormEvent) => {
             + Add another user
           </button>
         </div>
-
-
 
         <button
           type="submit"
