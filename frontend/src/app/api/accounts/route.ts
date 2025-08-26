@@ -411,15 +411,33 @@ export async function PUT(req: NextRequest) {
       return NextResponse.json({ message: `Account with qcode ${qcode} not found` }, { status: 404 });
     }
 
-    // Update the account with provided data (basic fields only; complex fields like allocations/custodian_codes require separate handling)
+    // Filter out fields that shouldn't be updated directly or are relation fields
+    const {
+      id,
+      account_id,
+      created_at,
+      account_custodian_codes, // Remove this as it's a relation field
+      ...filteredUpdateData
+    } = updateData;
+
+    // Update the account with filtered data
     const updatedAccount = await prisma.accounts.update({
       where: { qcode },
-      data: updateData,
+      data: filteredUpdateData,
+      include: {
+        account_custodian_codes: {
+          select: {
+            custodian_code: true,
+            created_at: true,
+          },
+        },
+      },
     });
 
-    // Note: For updating user_allocations, custodian_codes, zerodha_details, etc., add additional logic here (e.g., delete old and create new)
-
-    return NextResponse.json({ message: 'Account updated successfully', account: updatedAccount });
+    return NextResponse.json({ 
+      message: 'Account updated successfully', 
+      account: updatedAccount 
+    });
   } catch (error: unknown) {
     const errorMessage = error instanceof Error ? error.message : 'An unexpected error occurred';
     console.error('PUT /api/accounts error:', errorMessage);

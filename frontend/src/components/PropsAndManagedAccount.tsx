@@ -11,6 +11,7 @@ import LineChartOne from "@/components/charts/line/LineChartOne";
 import DefaultTab from "@/components/ui/tab/DefaultTab";
 import { ChevronDown, ChevronUp, SortAsc, SortDesc } from "lucide-react";
 import { sharedTableConfigs } from '../../shared-config/column';
+import Select from "./form/Select";
 import { API_BASE } from "@/lib/api";
 interface Row {
     id: number;
@@ -213,6 +214,48 @@ export default function PropsAndManagedAccount({ qcode }: PropsAndManagedAccount
             setIsLoading((prev) => ({ ...prev, [tableName]: false }));
         }
     };
+    useEffect(() => {
+        if (accountDetails) {
+            let accType = accountDetails.account_type;
+            let broker = accountDetails.broker;
+
+            // e.g. "managed_account_zerodha" → account_type = "managed_account", broker = "zerodha"
+            if (accType?.includes("_")) {
+                const [base, bkr] = accType.split("_");
+                if (["pms", "managed", "prop"].some(k => accType.startsWith(k))) {
+                    accType = base === "managed" ? "managed_account" : base;
+                    broker = bkr;
+                }
+            }
+
+            setEditForm({
+                ...accountDetails,
+                account_type: accType,
+                broker: broker,
+            });
+        }
+    }, [accountDetails]);
+
+
+    // derive account type safely from editForm (fallback to accountDetails on first render)
+    const accountType: string | undefined =
+        editForm?.account_type || accountDetails?.account_type;
+
+    const brokerOptions =
+        accountType === "pms"
+            ? [
+                { value: "zerodha", label: "Zerodha" },
+                { value: "emkay", label: "Emkay" },
+            ]
+            : accountType === "managed_account" || accountType === "prop"
+                ? [
+                    { value: "zerodha", label: "Zerodha" },
+                    { value: "jainam", label: "Jainam" },
+                    { value: "marwadi", label: "Marwadi" },
+                    { value: "sre", label: "SRE" },
+                ]
+                : [];
+
 
     const fetchChartData = async () => {
         setIsChartLoading(true);
@@ -1291,6 +1334,15 @@ export default function PropsAndManagedAccount({ qcode }: PropsAndManagedAccount
         ),
     }));
 
+    // Add these handlers for the dropdowns
+    const handleSelectAccountType = (option: any) => {
+        setEditForm((prev: any) => ({ ...prev, account_type: option.value }));
+    };
+
+    const handleSelectBroker = (option: any) => {
+        setEditForm((prev: any) => ({ ...prev, broker: option.value }));
+    };
+
     return (
         <>
             <div className="bg-white dark:bg-gray-800 p-6 rounded-lg shadow-sm border border-gray-200 dark:border-gray-800 mb-6">
@@ -1318,22 +1370,36 @@ export default function PropsAndManagedAccount({ qcode }: PropsAndManagedAccount
 
                             <div>
                                 <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                                    Broker
+                                    Account Type
                                 </label>
-                                <InputField
-                                    value={editForm.broker || ""}
-                                    onChange={(e) => handleEditChange("broker", e.target.value)}
+                                <Select
+                                    options={[
+                                        { value: "pms", label: "PMS" },
+                                        { value: "managed_account", label: "Managed Account" },
+                                        { value: "prop", label: "Prop Account" },
+                                    ]}
+                                    value={editForm.account_type ?? ""}                // string
+                                    onChange={(v) => handleEditChange("account_type", v)}
+                                    placeholder="Select Account Type"
                                 />
                             </div>
 
                             <div>
                                 <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                                    Account Type
+                                    Broker
                                 </label>
-                                <InputField
-                                    value={editForm.account_type || ""}
-                                    onChange={(e) => handleEditChange("account_type", e.target.value)}
+                                <Select
+                                    options={brokerOptions}
+                                    value={editForm.broker ?? ""}                      // string
+                                    onChange={(v) => handleEditChange("broker", v)}
+                                    placeholder="Select Broker"
+                                    disabled={brokerOptions.length === 0}              // matches new prop
                                 />
+                                {brokerOptions.length === 0 && (
+                                    <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                                        Please select an account type first to see broker options
+                                    </p>
+                                )}
                             </div>
 
                             <div>
@@ -1341,6 +1407,7 @@ export default function PropsAndManagedAccount({ qcode }: PropsAndManagedAccount
                                     Email Linked
                                 </label>
                                 <InputField
+                                    type="email"
                                     value={editForm.email_linked || ""}
                                     onChange={(e) => handleEditChange("email_linked", e.target.value)}
                                 />
@@ -1351,6 +1418,7 @@ export default function PropsAndManagedAccount({ qcode }: PropsAndManagedAccount
                                     Contact Number
                                 </label>
                                 <InputField
+                                    type="tel"
                                     value={editForm.contact_number || ""}
                                     onChange={(e) => handleEditChange("contact_number", e.target.value)}
                                 />
@@ -1416,6 +1484,86 @@ export default function PropsAndManagedAccount({ qcode }: PropsAndManagedAccount
                                     onChange={(e) => handleEditChange("remarks", e.target.value)}
                                 />
                             </div>
+
+                            {/* Show Zerodha fields if it's a managed account with Zerodha broker */}
+                            {editForm.account_type === "managed_account" && editForm.broker === "zerodha" && (
+                                <div className="space-y-4 border-2 border-blue-200 p-4 rounded-lg bg-blue-50 dark:bg-blue-900/20 dark:border-blue-800">
+                                    <h3 className="font-medium text-blue-800 dark:text-blue-300 mb-4">Zerodha Account Details</h3>
+
+                                    <div>
+                                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                                            Zerodha Account ID
+                                        </label>
+                                        <InputField
+                                            value={editForm.api_details?.zerodha_account_id || ""}
+                                            onChange={(e) => handleEditChange("api_details", {
+                                                ...editForm.api_details,
+                                                zerodha_account_id: e.target.value
+                                            })}
+                                        />
+                                    </div>
+
+                                    <div>
+                                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                                            Zerodha Email
+                                        </label>
+                                        <InputField
+                                            type="email"
+                                            value={editForm.api_details?.zerodha_email || ""}
+                                            onChange={(e) => handleEditChange("api_details", {
+                                                ...editForm.api_details,
+                                                zerodha_email: e.target.value
+                                            })}
+                                        />
+                                    </div>
+
+                                    <div>
+                                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                                            Zerodha Aadhar
+                                        </label>
+                                        <InputField
+                                            value={editForm.api_details?.zerodha_aadhar || ""}
+                                            onChange={(e) => handleEditChange("api_details", {
+                                                ...editForm.api_details,
+                                                zerodha_aadhar: e.target.value
+                                            })}
+                                        />
+                                    </div>
+
+                                    <div>
+                                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                                            Zerodha PAN
+                                        </label>
+                                        <InputField
+                                            value={editForm.api_details?.zerodha_pan || ""}
+                                            onChange={(e) => handleEditChange("api_details", {
+                                                ...editForm.api_details,
+                                                zerodha_pan: e.target.value
+                                            })}
+                                        />
+                                    </div>
+                                </div>
+                            )}
+
+                            {/* Show custodian codes for PMS accounts */}
+                            {editForm.account_type === "pms" && accountDetails?.account_custodian_codes && (
+                                <div className="space-y-4">
+                                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                                        Custodian Codes (Read-only in edit mode)
+                                    </label>
+                                    {accountDetails.account_custodian_codes.map((code: any, idx: number) => (
+                                        <InputField
+                                            key={idx}
+                                            value={code.custodian_code}
+                                            disabled={true}
+                                            className="bg-gray-100 dark:bg-gray-700"
+                                        />
+                                    ))}
+                                    <p className="text-xs text-gray-500 dark:text-gray-400">
+                                        Note: Custodian codes cannot be edited. Create a new account to modify custodian codes.
+                                    </p>
+                                </div>
+                            )}
 
                             <div>
                                 <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
