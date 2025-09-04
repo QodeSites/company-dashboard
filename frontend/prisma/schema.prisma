@@ -37,6 +37,7 @@ model accounts {
   pan                                                       String?
   remarks                                                   String?                      @default("NA")
   created_at                                                DateTime                     @default(now())
+  strategy                                                  String?
   account_access_account_access_source_account_idToaccounts account_access[]             @relation("account_access_source_account_idToaccounts")
   account_access_account_access_target_account_idToaccounts account_access[]             @relation("account_access_target_account_idToaccounts")
   account_custodian_codes                                   account_custodian_codes[]
@@ -328,4 +329,23 @@ model equity_holding {
   pnl_amount        Decimal?  @db.Decimal(15, 2)
   percent_pnl       Decimal?  @db.Decimal(5, 2)
   id                BigInt    @id
+}
+
+model master_sheet_test {
+  id                   Int       @id @default(autoincrement())
+  qcode                String    @db.VarChar(20)
+  date                 DateTime  @db.Date
+  portfolio_value      Decimal?  @db.Decimal(20, 4)
+  capital_in_out       Decimal?  @db.Decimal(20, 4)
+  nav                  Decimal?  @db.Decimal(20, 4)
+  prev_nav             Decimal?  @db.Decimal(20, 4)
+  pnl                  Decimal?  @db.Decimal(20, 4)
+  daily_p_l            Decimal?  @db.Decimal(20, 4)
+  exposure_value       Decimal?  @db.Decimal(20, 4)
+  prev_portfolio_value Decimal?  @db.Decimal(20, 4)
+  prev_exposure_value  Decimal?  @db.Decimal(20, 4)
+  prev_pnl             Decimal?  @db.Decimal(20, 4)
+  drawdown             Decimal?  @db.Decimal(20, 4)
+  system_tag           String?   @db.VarChar(50)
+  created_at           DateTime? @default(now()) @db.Date
 }

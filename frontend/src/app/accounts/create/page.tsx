@@ -7,7 +7,6 @@ import ComponentCard from "@/components/common/ComponentCard";
 import Label from "@/components/form/Label";
 import InputField from "@/components/form/input/InputField";
 import Select from "@/components/form/Select";
-import DatePicker from "@/components/form/date-picker";
 
 interface UserAllocation {
   icode: string;
@@ -19,21 +18,12 @@ interface User {
   user_name: string;
 }
 
-interface ZerodhaDetails {
-  account_id: string;
-  aadhar: string;
-  pan: string;
-  email: string;
-  phone: string;
-  password: string;
-}
-
 interface FormData {
   account_name: string;
   broker: string;
   account_type: string;
+  strategy?: string; // New field for strategy
   custodian_codes: string[];
-  zerodha_details?: ZerodhaDetails;
 }
 
 export default function CreateAccountPage() {
@@ -44,9 +34,7 @@ export default function CreateAccountPage() {
     custodian_codes: [""],
   });
 
-  const [users, setUsers] = useState<UserAllocation[]>([
-    { icode: "", date: "" },
-  ]);
+  const [users, setUsers] = useState<UserAllocation[]>([{ icode: "", date: "" }]);
   const [allUsers, setAllUsers] = useState<User[]>([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
@@ -71,17 +59,6 @@ export default function CreateAccountPage() {
     }));
   };
 
-  const handleZerodhaDetailsChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const { name, value } = e.target;
-    setFormData((prev) => ({
-      ...prev,
-      zerodha_details: {
-        ...prev.zerodha_details,
-        [name]: value,
-      } as ZerodhaDetails,
-    }));
-  };
-
   const handleCustodianCodeChange = (idx: number, value: string) => {
     const codes = [...formData.custodian_codes];
     codes[idx] = value;
@@ -100,8 +77,8 @@ export default function CreateAccountPage() {
       ...prev,
       account_type: value,
       broker: "",
+      strategy: undefined, // Reset strategy when account type changes
       custodian_codes: value === "pms" ? [""] : [],
-      zerodha_details: undefined, // Reset Zerodha details when account type changes
     }));
   };
 
@@ -109,18 +86,13 @@ export default function CreateAccountPage() {
     setFormData((prev) => ({
       ...prev,
       broker: value,
-      // Initialize zerodha_details if Managed Account + Zerodha
-      zerodha_details: 
-        prev.account_type === "managed_account" && value === "zerodha"
-          ? {
-              account_id: "",
-              aadhar: "",
-              pan: "",
-              email: "",
-              phone: "",
-              password: "",
-            }
-          : prev.zerodha_details,
+    }));
+  };
+
+  const handleSelectStrategy = (value: string) => {
+    setFormData((prev) => ({
+      ...prev,
+      strategy: value,
     }));
   };
 
@@ -148,52 +120,24 @@ export default function CreateAccountPage() {
       return false;
     }
     if (formData.account_type === "pms") {
-      const validCodes = formData.custodian_codes.filter(code => typeof code === "string" && code.trim() !== "");
+      const validCodes = formData.custodian_codes.filter(
+        (code) => typeof code === "string" && code.trim() !== ""
+      );
       if (validCodes.length === 0) {
         alert("At least one valid, non-empty custodian code is required for PMS accounts.");
         return false;
       }
     }
-    
-    // Validate Zerodha details for Managed Account + Zerodha combination
-    if (formData.account_type === "managed_account" && formData.broker === "zerodha") {
-      const zerodha = formData.zerodha_details;
-      if (!zerodha?.account_id) {
-        alert("Zerodha Account ID is required.");
-        return false;
-      }
-      if (!zerodha?.aadhar) {
-        alert("Aadhar number is required.");
-        return false;
-      }
-      if (!zerodha?.pan) {
-        alert("PAN number is required.");
-        return false;
-      }
-      if (!zerodha?.email) {
-        alert("Email linked to Zerodha is required.");
-        return false;
-      }
-      if (!zerodha?.phone) {
-        alert("Phone number linked to Zerodha is required.");
-        return false;
-      }
-      // if (!zerodha?.password) {
-      //   alert("Zerodha Account Password is required.");
-      //   return false;
-      // }
+    if (formData.account_type === "managed_account" && !formData.strategy) {
+      alert("Strategy is required for Managed Account.");
+      return false;
     }
-
     for (const [index, user] of users.entries()) {
       console.log(`Validating user ${index + 1}:`, user);
       if (!user.icode) {
         alert(`User selection is required for allocation ${index + 1}.`);
         return false;
       }
-      // if (!user.date) {
-      //   alert(`Date is required for allocation ${index + 1}.`);
-      //   return false;
-      // }
     }
     return true;
   };
@@ -203,17 +147,17 @@ export default function CreateAccountPage() {
 
     if (!validateForm()) return;
 
-    // Trim and filter custodian codes before submission
-    const trimmedCustodianCodes = formData.account_type === "pms"
-      ? formData.custodian_codes.map(code => code.trim()).filter(code => code !== "")
-      : formData.custodian_codes;
-    
-    const payload = { 
-      ...formData, 
+    const trimmedCustodianCodes =
+      formData.account_type === "pms"
+        ? formData.custodian_codes.map((code) => code.trim()).filter((code) => code !== "")
+        : formData.custodian_codes;
+
+    const payload = {
+      ...formData,
       custodian_codes: trimmedCustodianCodes,
-      user_allocations: users 
+      user_allocations: users,
     };
-    console.log("Submitting payload:", payload); // Debug log
+    console.log("Submitting payload:", payload);
 
     setIsSubmitting(true);
 
@@ -238,12 +182,12 @@ export default function CreateAccountPage() {
       const result = await response.json();
       alert(`✅ Account Created Successfully! New Code: ${result.account.qcode}`);
 
-      setFormData({ 
-        account_name: "", 
-        broker: "", 
-        account_type: "", 
+      setFormData({
+        account_name: "",
+        broker: "",
+        account_type: "",
+        strategy: undefined,
         custodian_codes: [""],
-        zerodha_details: undefined,
       });
       setUsers([{ icode: "", date: "" }]);
     } catch (error: unknown) {
@@ -258,20 +202,26 @@ export default function CreateAccountPage() {
   const brokerOptions =
     formData.account_type === "pms"
       ? [
-        { value: "zerodha", label: "Zerodha" },
-        { value: "emkay", label: "Emkay" },
-      ]
+          { value: "zerodha", label: "Zerodha" },
+          { value: "emkay", label: "Emkay" },
+        ]
       : formData.account_type === "managed_account" || formData.account_type === "prop"
-        ? [
+      ? [
           { value: "zerodha", label: "Zerodha" },
           { value: "jainam", label: "Jainam" },
           { value: "marwadi", label: "Marwadi" },
           { value: "sre", label: "SRE" },
         ]
-        : [];
+      : [];
 
-  // Check if we should show Zerodha additional fields
-  const showZerodhaFields = formData.account_type === "managed_account" && formData.broker === "zerodha";
+  const strategyOptions = [
+    { value: "QAW+", label: "QAW+" },
+    { value: "QAW++", label: "QAW++" },
+    { value: "QTF+", label: "QTF+" },
+    { value: "QTF++", label: "QTF++" },
+    { value: "QYE+", label: "QYE+" },
+    { value: "QYE++", label: "QYE++" },
+  ];
 
   return (
     <ComponentCard title="Create New Account">
@@ -314,7 +264,18 @@ export default function CreateAccountPage() {
           </div>
         )}
 
-        {/* only for PMS → custodian codes */}
+        {formData.account_type === "managed_account" && (
+          <div className="relative">
+            <Label>Strategy</Label>
+            <Select
+              options={strategyOptions}
+              placeholder="Select Strategy"
+              onChange={handleSelectStrategy}
+              className="dark:bg-dark-900"
+            />
+          </div>
+        )}
+
         {formData.account_type === "pms" && (
           <div className="space-y-4">
             <Label>Custodian Codes</Label>
@@ -340,85 +301,6 @@ export default function CreateAccountPage() {
           </div>
         )}
 
-        {/* Zerodha Additional Fields for Managed Account + Zerodha */}
-        {showZerodhaFields && (
-          <div className="space-y-4 border-2 border-blue-200 p-4 rounded-lg bg-blue-50">
-            <h3 className="font-medium text-blue-800 mb-4">Zerodha Account Details</h3>
-            
-            <div>
-              <Label>Phone Number (Linked to Zerodha)</Label>
-              <InputField
-                type="tel"
-                name="phone"
-                value={formData.zerodha_details?.phone || ""}
-                onChange={handleZerodhaDetailsChange}
-                placeholder="Enter phone number linked to Zerodha account"
-                disabled={isSubmitting}
-              />
-            </div>
-
-            <div>
-              <Label>Zerodha Account ID</Label>
-              <InputField
-                type="text"
-                name="account_id"
-                value={formData.zerodha_details?.account_id || ""}
-                onChange={handleZerodhaDetailsChange}
-                placeholder="Enter Zerodha Account ID"
-                disabled={isSubmitting}
-              />
-            </div>
-
-            <div>
-              <Label>Aadhar Number</Label>
-              <InputField
-                type="text"
-                name="aadhar"
-                value={formData.zerodha_details?.aadhar || ""}
-                onChange={handleZerodhaDetailsChange}
-                placeholder="Enter Aadhar Number"
-                disabled={isSubmitting}
-              />
-            </div>
-
-            <div>
-              <Label>PAN Number</Label>
-              <InputField
-                type="text"
-                name="pan"
-                value={formData.zerodha_details?.pan || ""}
-                onChange={handleZerodhaDetailsChange}
-                placeholder="Enter PAN Number"
-                disabled={isSubmitting}
-              />
-            </div>
-
-            <div>
-              <Label>Email (Linked to Zerodha)</Label>
-              <InputField
-                type="email"
-                name="email"
-                value={formData.zerodha_details?.email || ""}
-                onChange={handleZerodhaDetailsChange}
-                placeholder="Enter email linked to Zerodha account"
-                disabled={isSubmitting}
-              />
-            </div>
-
-            {/* <div>
-              <Label>Zerodha Account Password</Label>
-              <InputField
-                type="password"
-                name="password"
-                value={formData.zerodha_details?.password || ""}
-                onChange={handleZerodhaDetailsChange}
-                placeholder="Enter Zerodha Account Password"
-                disabled={isSubmitting}
-              />
-            </div> */}
-          </div>
-        )}
-
         <div className="space-y-4">
           <Label>Add Users and Allocations</Label>
           {users.map((entry, index) => (
@@ -440,17 +322,6 @@ export default function CreateAccountPage() {
                     ))}
                   </select>
                 </div>
-                {/* <div>
-                  <Label>Date</Label>
-                  <DatePicker
-                    onChange={(date) => {
-                      const formatted = date ? new Date(date[0]).toISOString().split("T")[0] : "";
-                      console.log(`Setting date for allocation ${index + 1}:`, formatted);
-                      handleUserChange(index, "date", formatted);
-                    }}
-                    id={`allocationDate-${index}`}
-                  />
-                </div> */}
               </div>
             </div>
           ))}
@@ -466,8 +337,9 @@ export default function CreateAccountPage() {
 
         <button
           type="submit"
-          className={`bg-blue-600 text-white px-4 py-2 rounded text-sm font-medium flex items-center justify-center ${isSubmitting ? "opacity-50 cursor-not-allowed" : "hover:bg-blue-700"
-            }`}
+          className={`bg-blue-600 text-white px-4 py-2 rounded text-sm font-medium flex items-center justify-center ${
+            isSubmitting ? "opacity-50 cursor-not-allowed" : "hover:bg-blue-700"
+          }`}
           disabled={isSubmitting}
         >
           {isSubmitting ? (

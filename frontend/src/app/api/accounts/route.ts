@@ -1,6 +1,3 @@
-
-
-
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { randomUUID } from 'crypto';
@@ -24,7 +21,7 @@ export async function POST(req: NextRequest) {
       pan,
       remarks = 'NA',
       custodian_codes,
-      zerodha_details, // New field for Zerodha specific data
+      strategy, // Include strategy from payload
     } = body;
 
     // Validate required fields
@@ -35,6 +32,7 @@ export async function POST(req: NextRequest) {
       );
     }
 
+    // Validate account_type
     if (!['pms', 'managed_account', 'prop'].includes(account_type)) {
       return NextResponse.json(
         { message: "Invalid account_type. Must be 'pms', 'managed_account', or 'prop'" },
@@ -42,7 +40,39 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // Validate user allocations (required for all account types)
+    // Validate broker based on account_type
+    const validBrokers = {
+      pms: ['zerodha', 'emkay'],
+      managed_account: ['zerodha', 'jainam', 'marwadi', 'sre'],
+      prop: ['zerodha', 'jainam', 'marwadi', 'sre'],
+    };
+    if (!validBrokers[account_type].includes(broker)) {
+      return NextResponse.json(
+        {
+          message: `Invalid broker for ${account_type}. Must be one of: ${validBrokers[account_type].join(', ')}`,
+        },
+        { status: 400 }
+      );
+    }
+
+    // Validate strategy for managed_account
+    if (account_type === 'managed_account') {
+      const validStrategies = ['QAW+', 'QAW++', 'QTF+', 'QTF++', 'QYE+', 'QYE++'];
+      if (!strategy || !validStrategies.includes(strategy)) {
+        return NextResponse.json(
+          { message: `Strategy is required for managed_account and must be one of: ${validStrategies.join(', ')}` },
+          { status: 400 }
+        );
+      }
+    } else if (strategy) {
+      // Ensure strategy is null for non-managed accounts
+      return NextResponse.json(
+        { message: 'Strategy can only be set for managed_account types' },
+        { status: 400 }
+      );
+    }
+
+    // Validate user allocations
     if (!user_allocations || !Array.isArray(user_allocations) || user_allocations.length === 0) {
       return NextResponse.json(
         { message: 'user_allocations is required and must be a non-empty array' },
@@ -58,57 +88,10 @@ export async function POST(req: NextRequest) {
           { status: 400 }
         );
       }
-      // Ensure all codes are non-empty strings
       const validCodes = custodian_codes.filter((code: any) => typeof code === 'string' && code.trim() !== '');
       if (validCodes.length === 0) {
         return NextResponse.json(
           { message: 'At least one valid, non-empty custodian code is required for PMS accounts' },
-          { status: 400 }
-        );
-      }
-    }
-
-    // Validate Zerodha details for Managed Account + Zerodha combination
-    if (account_type === 'managed_account' && broker === 'zerodha') {
-      if (!zerodha_details) {
-        return NextResponse.json(
-          { message: 'Zerodha details are required for Managed Account with Zerodha broker' },
-          { status: 400 }
-        );
-      }
-
-      const { account_id, aadhar: zerodha_aadhar, pan: zerodha_pan, email, password } = zerodha_details;
-
-      if (!account_id || !zerodha_aadhar || !zerodha_pan || !email ) {
-        return NextResponse.json(
-          { message: 'All Zerodha details are required: account_id, aadhar, pan, email, password' },
-          { status: 400 }
-        );
-      }
-
-      // Basic email validation
-      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-      if (!emailRegex.test(email)) {
-        return NextResponse.json(
-          { message: 'Invalid email format for Zerodha email' },
-          { status: 400 }
-        );
-      }
-
-      // Basic PAN validation (format: ABCDE1234F)
-      const panRegex = /^[A-Z]{5}[0-9]{4}[A-Z]{1}$/;
-      if (!panRegex.test(zerodha_pan)) {
-        return NextResponse.json(
-          { message: 'Invalid PAN format. Expected format: ABCDE1234F' },
-          { status: 400 }
-        );
-      }
-
-      // Basic Aadhar validation (12 digits)
-      const aadharRegex = /^[0-9]{12}$/;
-      if (!aadharRegex.test(zerodha_aadhar.replace(/\s/g, ''))) {
-        return NextResponse.json(
-          { message: 'Invalid Aadhar format. Expected 12 digits' },
           { status: 400 }
         );
       }
@@ -138,56 +121,35 @@ export async function POST(req: NextRequest) {
         `);
       }
 
-      // Acquire advisory lock to prevent race conditions
+      // Acquire advisory lock
       await tx.$executeRaw`SELECT pg_advisory_xact_lock(12345);`;
 
-      // Get the next sequence value
+      // Get next sequence value
       const sequenceResult = await tx.$queryRaw<{ nextval: number }[]>`
         SELECT nextval('qcode_seq') AS nextval
       `;
       const sequenceValue = sequenceResult[0].nextval;
       const newQcode = `QAC${String(sequenceValue).padStart(5, '0')}`;
 
-      // Prepare account data with Zerodha details if applicable
-      let accountData: any = {
+      // Prepare account data
+      const accountData = {
         account_name,
         broker,
         account_type,
-        email_linked: email_linked || (zerodha_details?.email || null),
+        email_linked,
         contact_number,
-        login_id: login_id || (zerodha_details?.account_id || null),
-        login_password: login_password || (zerodha_details?.password || null),
+        login_id,
+        login_password,
         totp_secret,
         nominees,
-        aadhar: aadhar || (zerodha_details?.aadhar || null),
-        pan: pan || (zerodha_details?.pan || null),
+        aadhar,
+        pan,
         remarks,
         qcode: newQcode,
         account_id: randomUUID(),
+        api_details,
+        strategy: account_type === 'managed_account' ? strategy : null, // Set strategy for managed_account, null otherwise
       };
-
-      // For Zerodha managed accounts, store additional details in api_details JSON field
-      if (account_type === 'managed_account' && broker === 'zerodha' && zerodha_details) {
-        accountData.api_details = {
-          ...api_details,
-          zerodha_account_id: zerodha_details.account_id,
-          zerodha_email: zerodha_details.email,
-          zerodha_aadhar: zerodha_details.aadhar,
-          zerodha_pan: zerodha_details.pan,
-          account_type: 'managed_account_zerodha',
-          broker_specific_data: {
-            login_credentials: {
-              account_id: zerodha_details.account_id,
-              // password: zerodha_details.password,
-            },
-            verification_docs: {
-              aadhar: zerodha_details.aadhar,
-              pan: zerodha_details.pan,
-              email: zerodha_details.email,
-            }
-          }
-        };
-      }
 
       // Create the account
       const account = await tx.accounts.create({
@@ -217,7 +179,6 @@ export async function POST(req: NextRequest) {
         access_level?: string;
       }
 
-      // Calculate total amount for prop accounts
       let totalAmount = 0;
       if (account_type === 'prop') {
         totalAmount = user_allocations.reduce(
@@ -229,12 +190,10 @@ export async function POST(req: NextRequest) {
       for (const alloc of user_allocations) {
         const { icode, date, amount, access_level } = alloc;
 
-        // Validate allocation fields
         if (!icode) {
           throw new Error('Each allocation must have icode');
         }
 
-        // Additional validation for prop accounts
         if (account_type === 'prop') {
           if (!amount || !access_level) {
             throw new Error(
@@ -247,13 +206,11 @@ export async function POST(req: NextRequest) {
           }
         }
 
-        // Verify user exists
         const user = await tx.clients.findUnique({ where: { icode } });
         if (!user) {
           throw new Error(`User with icode ${icode} does not exist`);
         }
 
-        // Create pooled account user mapping
         await tx.pooled_account_users.create({
           data: {
             qcode: newQcode,
@@ -262,7 +219,6 @@ export async function POST(req: NextRequest) {
           },
         });
 
-        // Create or update allocation
         const allocationAmount = account_type === 'prop' ? parseFloat(amount!.toString()) : 0;
         const allocationPercent =
           account_type === 'prop' && totalAmount !== 0 ? (allocationAmount / totalAmount) * 100 : 0;
@@ -292,10 +248,9 @@ export async function POST(req: NextRequest) {
       return account;
     });
 
-    return NextResponse.json({ 
-      message: 'Account created with allocations and custodian codes!', 
+    return NextResponse.json({
+      message: 'Account created with allocations and custodian codes!',
       account: result,
-      zerodha_details_stored: account_type === 'managed_account' && broker === 'zerodha' ? true : false
     });
   } catch (error: unknown) {
     const errorMessage = error instanceof Error ? error.message : 'An unexpected error occurred';
@@ -303,7 +258,6 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ message: `❌ Error creating account: ${errorMessage}` }, { status: 500 });
   }
 }
-
 export async function GET(req: NextRequest) {
   try {
     // Extract parameters from query
@@ -354,6 +308,7 @@ export async function GET(req: NextRequest) {
         account_name: true,
         account_type: true,
         broker: true,
+        strategy: true, // Added strategy field
         email_linked: true,
         contact_number: true,
         login_id: true,
@@ -391,11 +346,10 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ message: `❌ Error fetching accounts: ${errorMessage}` }, { status: 500 });
   }
 }
-
 export async function PUT(req: NextRequest) {
   try {
     const body = await req.json();
-    const { qcode, ...updateData } = body;
+    const { qcode, account_type, strategy, ...updateData } = body;
 
     // Validate required field
     if (!qcode) {
@@ -411,6 +365,25 @@ export async function PUT(req: NextRequest) {
       return NextResponse.json({ message: `Account with qcode ${qcode} not found` }, { status: 404 });
     }
 
+    // Validate account_type if provided
+    if (account_type && !['pms', 'managed_account', 'prop'].includes(account_type)) {
+      return NextResponse.json(
+        { message: "Invalid account_type. Must be 'pms', 'managed_account', or 'prop'" },
+        { status: 400 }
+      );
+    }
+
+    // Validate strategy for managed_account
+    if (account_type === 'managed_account') {
+      const validStrategies = ['QAW+', 'QAW++', 'QTF+', 'QTF++', 'QYE+', 'QYE++'];
+      if (!strategy || !validStrategies.includes(strategy)) {
+        return NextResponse.json(
+          { message: `Strategy is required for managed_account and must be one of: ${validStrategies.join(', ')}` },
+          { status: 400 }
+        );
+      }
+    }
+
     // Filter out fields that shouldn't be updated directly or are relation fields
     const {
       id,
@@ -420,10 +393,17 @@ export async function PUT(req: NextRequest) {
       ...filteredUpdateData
     } = updateData;
 
+    // Ensure strategy is set to null for non-managed accounts
+    const finalUpdateData = {
+      ...filteredUpdateData,
+      account_type: account_type || existingAccount.account_type,
+      strategy: account_type === 'managed_account' ? strategy : null,
+    };
+
     // Update the account with filtered data
     const updatedAccount = await prisma.accounts.update({
       where: { qcode },
-      data: filteredUpdateData,
+      data: finalUpdateData,
       include: {
         account_custodian_codes: {
           select: {
@@ -434,9 +414,9 @@ export async function PUT(req: NextRequest) {
       },
     });
 
-    return NextResponse.json({ 
-      message: 'Account updated successfully', 
-      account: updatedAccount 
+    return NextResponse.json({
+      message: 'Account updated successfully',
+      account: updatedAccount,
     });
   } catch (error: unknown) {
     const errorMessage = error instanceof Error ? error.message : 'An unexpected error occurred';
@@ -444,7 +424,6 @@ export async function PUT(req: NextRequest) {
     return NextResponse.json({ message: `❌ Error updating account: ${errorMessage}` }, { status: 500 });
   }
 }
-
 export async function DELETE(req: NextRequest) {
   try {
     const { qcode } = await req.json();
