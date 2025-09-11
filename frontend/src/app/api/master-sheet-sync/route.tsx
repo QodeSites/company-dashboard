@@ -90,9 +90,9 @@ export async function POST(request: NextRequest) {
           nav: record.nav,
           prev_nav: record.prev_nav,
           pnl: record.pnl,
-          daily_p_l: record.portfolio_value && record.portfolio_value !== 0 
-            ? (Number(record.pnl) / Number(record.portfolio_value) * 100) 
-            : null,
+         daily_p_l: record.portfolio_value != null && Number(record.portfolio_value) !== 0 
+  ? (Number(record.pnl) / Number(record.portfolio_value) * 100) 
+  : null,
           exposure_value: record.exposure_value,
           prev_portfolio_value: record.prev_portfolio_value,
           prev_exposure_value: record.prev_exposure_value,
