@@ -18,6 +18,62 @@ interface Account {
   linked_accounts: { qcode: string; account_name: string; account_type: string }[];
 }
 
+interface ClientAccessButtonProps {
+  icode: string;
+  userName: string;
+}
+
+function ClientAccessButton({ icode, userName }: ClientAccessButtonProps) {
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
+
+  const handleAccessClient = async () => {
+
+
+    setLoading(true);
+    setError('');
+
+    try {
+      const response = await fetch('/api/generate-client-access', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ clientId: icode }),
+      });
+
+      const data = await response.json();
+
+      if (data.success) {
+        // Open portfolio in new tab
+        window.open(data.accessUrl, '_blank');
+      } else {
+        setError(data.error || 'Failed to generate access');
+      }
+    } catch (err) {
+      setError('Network error occurred');
+      console.error('Access generation error:', err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <div className="flex flex-col gap-2">
+      <button
+        onClick={handleAccessClient}
+        disabled={loading}
+        className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
+      >
+        {loading ? 'Generating Access...' : 'View Portfolio'}
+      </button>
+      {error && (
+        <span className="text-red-500 text-sm">{error}</span>
+      )}
+    </div>
+  );
+}
+
 export default function AccountsTable() {
   const [accounts, setAccounts] = useState<Account[]>([]);
   const [isDeleting, setIsDeleting] = useState<string | null>(null);
@@ -100,10 +156,13 @@ export default function AccountsTable() {
                       <TableCell className="px-5 py-4 text-theme-sm text-gray-700 dark:text-white/90">{acc.qcode}</TableCell>
                       <TableCell className="px-5 py-4 text-theme-sm text-gray-700 dark:text-white/90">{acc.account_type}</TableCell>
                       <TableCell className="px-5 py-4 text-theme-sm text-gray-700 dark:text-white/90">
-                        <ul className="flex flex-wrap gap-1">
+                        <ul className="flex flex-wrap gap-2">
                           {acc.users?.map((u) => (
-                            <li key={u.icode} className="bg-gray-100 px-2 py-1 rounded-full text-xs text-gray-800 dark:bg-gray-800 dark:text-white/90">
-                              {u.user_name} ({u.icode})
+                            <li key={u.icode} className="flex items-center gap-2">
+                              <span className="bg-gray-100 px-2 py-1 rounded-full text-xs text-gray-800 dark:bg-gray-800 dark:text-white/90">
+                                {u.user_name} ({u.icode})
+                              </span>
+                              <ClientAccessButton icode={u.icode} userName={u.user_name} />
                             </li>
                           ))}
                         </ul>
