@@ -91,6 +91,15 @@ export default function PmsAllocationTable() {
     const [cashFilterValue, setCashFilterValue] = useState('');
     const [cashFilterOperator, setCashFilterOperator] = useState('greater');
 
+    const formatNumber = useCallback((num: number | string | null | undefined): string => {
+        if (num == null) return "0.00";
+        const parsed = parseFloat(num.toString());
+        return isNaN(parsed)
+            ? "0.00"
+            : parsed.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    }, []);
+
+
     useEffect(() => {
         const sum = Object.values(modelPercentages).reduce((acc, value) => acc + (value || 0), 0);
         setIsModelSumExceeding(sum > 100);
@@ -180,21 +189,43 @@ export default function PmsAllocationTable() {
 
     // Update totalRupeesByCustodian to handle new clients
     const totalRupeesByCustodian = useMemo(() => {
+        console.log('\n=== CALCULATING TOTAL RUPEES BY CUSTODIAN ===');
+
         const totals = uniqueCustodianCodes.reduce((acc, custodianCode) => {
             const newClient = newCustodianCodes.find((client) => client.name === custodianCode);
             if (newClient) {
                 acc[custodianCode] = parseFloat(newClient.amount) || 0;
             } else {
-                const total = filteredAllocations
-                    .filter((item) => item.custodian_code === custodianCode)
-                    .reduce((sum, item) => {
-                        const value = parseFloat(item.value?.toString() ?? "0");
-                        return sum + (isNaN(value) ? 0 : value);
-                    }, 0);
+                const clientAllocations = filteredAllocations.filter((item) => item.custodian_code === custodianCode);
+
+                console.log(`\n--- Client: ${custodianCode} ---`);
+                console.log(`Total allocations: ${clientAllocations.length}`);
+
+                // Debug first 5 values
+                console.log('Sample values:');
+                clientAllocations.slice(0, 5).forEach(item => {
+                    console.log(`  ${item.stock_name}: value = ${item.value}`);
+                });
+
+                const total = clientAllocations.reduce((sum, item) => {
+                    const value = parseFloat(item.value?.toString() ?? "0");
+                    return sum + (isNaN(value) ? 0 : value);
+                }, 0);
+
+                console.log(`Raw sum: ${total}`);
+                console.log(`Formatted: ₹${formatNumber(total)}`);
+
                 acc[custodianCode] = total;
             }
             return acc;
         }, {} as { [key: string]: number });
+
+        console.log('\n=== TOTALS SUMMARY ===');
+        Object.entries(totals).forEach(([code, total]) => {
+            console.log(`${code}: ${total.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`);
+        });
+        console.log('=== END TOTALS ===\n');
+
         return totals;
     }, [uniqueCustodianCodes, filteredAllocations, newCustodianCodes]);
 
@@ -382,13 +413,6 @@ export default function PmsAllocationTable() {
         ]);
     }, [filteredSummaryData]);
 
-    const formatNumber = useCallback((num: number | string | null | undefined): string => {
-        if (num == null) return "0.00";
-        const parsed = parseFloat(num.toString());
-        return isNaN(parsed)
-            ? "0.00"
-            : parsed.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-    }, []);
 
     const formatPercent = useCallback((num: number | string | null | undefined): string => {
         if (num == null) return "0.00%";
@@ -398,6 +422,12 @@ export default function PmsAllocationTable() {
 
     const calculateTotals = useCallback(
         (items: Summary[], isGrandTotal: boolean = false) => {
+            const assetClass = items.length > 0 ? items[0].asset_class : 'Unknown';
+            console.log(`\n=== CALCULATING TOTALS for ${assetClass} ===`);
+            console.log('Tab:', tab);
+            console.log('Display mode:', displayMode);
+            console.log('Number of items:', items.length);
+
             const totals = {
                 totalPercent: 0,
                 modelPercent: 0,
@@ -406,6 +436,9 @@ export default function PmsAllocationTable() {
                     {} as { [key: string]: number }
                 ),
             };
+
+            let itemsProcessed = 0;
+            let itemsSkipped = 0;
 
             items.forEach((item) => {
                 const totalPercent = parseFloat(item.total_percent?.toString() ?? "0");
@@ -427,20 +460,47 @@ export default function PmsAllocationTable() {
                             : percentValue;
                     let parsedPercent = adjustedPercentValue != null ? parseFloat(adjustedPercentValue.toString()) : 0;
 
+                    // THIS IS THE FILTERING LOGIC - Debug it
+                    let skipped = false;
                     if (tab === "change" && item.asset_class !== "Cash") {
-                        if (Math.abs(parsedPercent) <= bufferValue) return;
+                        if (Math.abs(parsedPercent) <= bufferValue) {
+                            skipped = true;
+                        }
                         const filter = rowFilters[item.key] || "both";
-                        if (filter === "buy" && parsedPercent <= bufferValue) return;
-                        if (filter === "sell" && parsedPercent >= -bufferValue) return;
-                        if (filter === "none") return;
+                        if (filter === "buy" && parsedPercent <= bufferValue) {
+                            skipped = true;
+                        }
+                        if (filter === "sell" && parsedPercent >= -bufferValue) {
+                            skipped = true;
+                        }
+                        if (filter === "none") {
+                            skipped = true;
+                        }
+
+                        if (skipped && custodianCode === "QFH0001" && assetClass === "Derivatives") {
+                            console.log(`SKIPPED ${item.key}: filter=${filter}, percent=${parsedPercent}`);
+                            itemsSkipped++;
+                            return;
+                        }
                     }
+
                     const value =
                         displayMode === "percent"
                             ? parsedPercent
                             : totalRupeesByCustodianRef.current[custodianCode] * (parsedPercent / 100);
+
                     totals.clientTotals[custodianCode] += isNaN(value) ? 0 : value;
+
+                    if (custodianCode === "QFH0001" && assetClass === "Derivatives") {
+                        console.log(`ADDED ${item.key}: percent=${parsedPercent}, value=${value}`);
+                        itemsProcessed++;
+                    }
                 });
             });
+
+            console.log(`Items processed: ${itemsProcessed}, Items skipped: ${itemsSkipped}`);
+            console.log('QFH0001 total:', totals.clientTotals["QFH0001"]);
+            console.log('=== END TOTALS ===\n');
 
             return totals;
         },
@@ -534,6 +594,10 @@ export default function PmsAllocationTable() {
             custodianCodes: string[],
             totalRupees: { [key: string]: number }
         ) => {
+            console.log('\n>>> ADJUST OTHER STOCKS <<<');
+            console.log('Value to distribute:', valueChange);
+            console.log('Excluded keys:', changedKeys);
+
             const newModelPercentages = { ...modelPercentages };
             const newAdjustedAllocations: {
                 [key: string]: { [custodianCode: string]: { percent: number; rupees: number } };
@@ -548,19 +612,30 @@ export default function PmsAllocationTable() {
                     s.key !== "NIPPON INDIA ETF LIQUID BEES"
             );
 
+            console.log('Stocks available for adjustment:', otherStocks.map(s => s.key));
+
             const totalOtherModelPercent = otherStocks.reduce((sum, s) => {
                 const percent = newModelPercentages[s.key] || 0;
                 return sum + percent;
             }, 0);
 
+            console.log('Total % in other stocks:', totalOtherModelPercent.toFixed(2));
+
             if (totalOtherModelPercent > 0) {
                 if (valueChange > 0) {
+                    console.log('\n--- DECREASING other stocks (you increased main stock) ---');
                     otherStocks.forEach((s) => {
                         const currentModelPercent = newModelPercentages[s.key] || 0;
                         if (currentModelPercent > 0) {
                             const proportion = currentModelPercent / totalOtherModelPercent;
                             const adjustment = valueChange * proportion;
                             const newPercent = Math.max(0, currentModelPercent - adjustment);
+
+                            console.log(`  ${s.key}:`);
+                            console.log(`    Current: ${currentModelPercent.toFixed(2)}%`);
+                            console.log(`    Proportion: ${(proportion * 100).toFixed(2)}%`);
+                            console.log(`    Adjustment: -${adjustment.toFixed(2)}%`);
+                            console.log(`    New: ${newPercent.toFixed(2)}%`);
 
                             newModelPercentages[s.key] = newPercent;
                             newAdjustedAllocations[s.key] = updateAllocationsForKey(
@@ -572,6 +647,7 @@ export default function PmsAllocationTable() {
                         }
                     });
                 } else {
+                    console.log('\n--- INCREASING other stocks (you decreased main stock) ---');
                     const maxIncrease = Math.abs(valueChange);
                     const desiredIncreases: { key: string; increase: number }[] = [];
                     otherStocks.forEach((s) => {
@@ -590,10 +666,18 @@ export default function PmsAllocationTable() {
                     const scaleFactor =
                         totalDesiredIncrease > 0 ? Math.min(1, maxIncrease / totalDesiredIncrease) : 0;
 
+                    console.log('Scale factor:', scaleFactor.toFixed(4));
+
                     desiredIncreases.forEach(({ key: sKey, increase }) => {
                         const scaledIncrease = increase * scaleFactor;
                         const currentModelPercent = newModelPercentages[sKey] || 0;
                         const newPercent = currentModelPercent + scaledIncrease;
+
+                        console.log(`  ${sKey}:`);
+                        console.log(`    Current: ${currentModelPercent.toFixed(2)}%`);
+                        console.log(`    Desired increase: +${increase.toFixed(2)}%`);
+                        console.log(`    Scaled increase: +${scaledIncrease.toFixed(2)}%`);
+                        console.log(`    New: ${newPercent.toFixed(2)}%`);
 
                         newModelPercentages[sKey] = newPercent;
                         newAdjustedAllocations[sKey] = updateAllocationsForKey(
@@ -605,6 +689,7 @@ export default function PmsAllocationTable() {
                     });
                 }
             } else {
+                console.log('\n--- FALLBACK: No other stocks with weight ---');
                 const adjustKey = Object.keys(newModelPercentages).find(
                     (k) =>
                         !excludeKeys.includes(k) &&
@@ -619,6 +704,8 @@ export default function PmsAllocationTable() {
                             ? Math.max(0, currentPercent - valueChange)
                             : currentPercent + Math.abs(valueChange);
 
+                    console.log(`Adjusting ${adjustKey}: ${currentPercent.toFixed(2)}% → ${newPercent.toFixed(2)}%`);
+
                     newModelPercentages[adjustKey] = newPercent;
                     newAdjustedAllocations[adjustKey] = updateAllocationsForKey(
                         adjustKey,
@@ -629,6 +716,7 @@ export default function PmsAllocationTable() {
                 }
             }
 
+            console.log('>>> ADJUST OTHER STOCKS END <<<\n');
             return { newModelPercentages, newAdjustedAllocations };
         },
         [updateAllocationsForKey]
@@ -636,7 +724,13 @@ export default function PmsAllocationTable() {
 
     const handleModelChange = useCallback(
         (key: string, value: string, updateInput: boolean = true) => {
+            console.log('\n=== MODEL CHANGE START ===');
+            console.log('Stock:', key);
+            console.log('New Value:', value);
+            console.log('Old Value:', modelPercentages[key]);
+
             if (value === "") {
+                console.log('Empty value - resetting to 0');
                 setInputValues((prev) => ({ ...prev, [key]: "0.00" }));
                 setInputErrors((prev) => ({ ...prev, [key]: false }));
                 setModelPercentages((prev) => ({ ...prev, [key]: 0 }));
@@ -667,11 +761,14 @@ export default function PmsAllocationTable() {
 
             const parsedValue = parseFloat(value);
             if (isNaN(parsedValue) || parsedValue < 0) {
+                console.log('Invalid value - setting error');
                 setInputErrors((prev) => ({ ...prev, [key]: true }));
                 return;
             }
 
+            console.log('Valid parsed value:', parsedValue);
             setInputErrors((prev) => ({ ...prev, [key]: false }));
+
             if (updateInput) {
                 setInputValues((prev) => ({ ...prev, [key]: parsedValue.toFixed(2) }));
             }
@@ -688,14 +785,20 @@ export default function PmsAllocationTable() {
             ]);
 
             if (!changedKeys.includes(key)) {
+                console.log('Adding to changed keys:', key);
                 setChangedKeys((prev) => [...prev, key]);
             }
 
             const oldValue = modelPercentages[key] || 0;
             const valueChange = parsedValue - oldValue;
+            console.log('Value Change:', valueChange);
+            console.log('Direction:', valueChange > 0 ? 'INCREASE' : 'DECREASE');
 
             setModelPercentages((prev) => {
                 const newModelPercentages = { ...prev, [key]: parsedValue };
+                console.log('\n--- Before Adjustment ---');
+                console.log('Total before:', Object.values(prev).reduce((sum, val) => sum + val, 0));
+
                 let updatedAllocations = {
                     [key]: updateAllocationsForKey(
                         key,
@@ -706,6 +809,9 @@ export default function PmsAllocationTable() {
                 };
 
                 if (valueChange !== 0) {
+                    console.log('\n--- Calling adjustOtherStocks ---');
+                    console.log('Changed keys to exclude:', [...changedKeys, key]);
+
                     const { newModelPercentages: adjustedModelPercentages, newAdjustedAllocations } =
                         adjustOtherStocks(
                             valueChange,
@@ -715,10 +821,18 @@ export default function PmsAllocationTable() {
                             uniqueCustodianCodes,
                             totalRupeesByCustodianRef.current
                         );
+
+                    console.log('\n--- After Adjustment ---');
+                    console.log('Total after:', Object.values(adjustedModelPercentages).reduce((sum, val) => sum + val, 0));
+                    console.log('Adjusted stocks:', Object.keys(newAdjustedAllocations).filter(k => k !== key));
+
                     setInputValues((prevInput) => {
                         const newInputValues = { ...prevInput };
                         Object.keys(newAdjustedAllocations).forEach((k) => {
                             newInputValues[k] = (adjustedModelPercentages[k] || 0).toFixed(2);
+                            if (k !== key) {
+                                console.log(`  ${k}: ${prev[k]?.toFixed(2) || '0.00'} → ${adjustedModelPercentages[k].toFixed(2)}`);
+                            }
                         });
                         return newInputValues;
                     });
@@ -727,6 +841,7 @@ export default function PmsAllocationTable() {
                         ...prev,
                         ...updatedAllocations,
                     }));
+                    console.log('=== MODEL CHANGE END ===\n');
                     return adjustedModelPercentages;
                 }
 
@@ -734,6 +849,8 @@ export default function PmsAllocationTable() {
                     ...prev,
                     ...updatedAllocations,
                 }));
+                console.log('No adjustment needed (valueChange = 0)');
+                console.log('=== MODEL CHANGE END ===\n');
                 return newModelPercentages;
             });
         },
@@ -747,6 +864,8 @@ export default function PmsAllocationTable() {
             adjustOtherStocks,
         ]
     );
+
+
 
     const handleBlur = useCallback(
         (key: string, value: string) => {
@@ -1694,14 +1813,18 @@ export default function PmsAllocationTable() {
                                             .sort(([a], [b]) => assetClassOrder.indexOf(a) - assetClassOrder.indexOf(b))
                                             .map(([assetClass, assetClassItems]) => {
                                                 const totals = calculateTotals(assetClassItems);
+                                                // const clientValues = filteredClients.map((custodianCode) => {
+                                                //     const value = tab === "total"
+                                                //         ? totals.clientTotals[custodianCode]
+                                                //         : totals.clientTotals[custodianCode];
+                                                //     return displayMode === "percent"
+                                                //         ? value
+                                                //         : value * (totalRupeesByCustodianRef.current[custodianCode] / 100);
+                                                // }).filter((value) => value != null);
                                                 const clientValues = filteredClients.map((custodianCode) => {
-                                                    const value = tab === "total"
-                                                        ? totals.clientTotals[custodianCode]
-                                                        : totals.clientTotals[custodianCode];
-                                                    return displayMode === "percent"
-                                                        ? value
-                                                        : value * (totalRupeesByCustodianRef.current[custodianCode] / 100);
+                                                    return totals.clientTotals[custodianCode];
                                                 }).filter((value) => value != null);
+
                                                 const minValue = clientValues.length > 0 ? Math.min(...clientValues) : 0;
                                                 const maxValue = clientValues.length > 0 ? Math.max(...clientValues) : 0;
                                                 return (
@@ -1735,17 +1858,18 @@ export default function PmsAllocationTable() {
                                                                 <td
                                                                     key={custodianCode}
                                                                     className={`p-3 text-right font-semibold border-r border-gray-200 ${tab === "change"
-                                                                        ? totals.clientTotals[custodianCode] > bufferValue
-                                                                            ? "text-blue-500"
-                                                                            : totals.clientTotals[custodianCode] < -bufferValue
-                                                                                ? "text-red-500"
-                                                                                : "text-gray-900"
-                                                                        : "text-gray-900"
+                                                                            ? totals.clientTotals[custodianCode] > bufferValue
+                                                                                ? "text-blue-500"
+                                                                                : totals.clientTotals[custodianCode] < -bufferValue
+                                                                                    ? "text-red-500"
+                                                                                    : "text-gray-900"
+                                                                            : "text-gray-900"
                                                                         }`}
                                                                 >
+                                                                    {/* FIX: Use totals directly - calculateTotals already returns correct units */}
                                                                     {displayMode === "percent"
                                                                         ? formatPercent(totals.clientTotals[custodianCode])
-                                                                        : formatNumber(totals.clientTotals[custodianCode] * (totalRupeesByCustodianRef.current[custodianCode] / 100))}
+                                                                        : formatNumber(totals.clientTotals[custodianCode])}
                                                                 </td>
                                                             ))}
                                                         </tr>
@@ -1886,10 +2010,21 @@ export default function PmsAllocationTable() {
                                                                                     adjustedValues[custodianCode]?.[item.key] != null
                                                                                     ? adjustedValues[custodianCode][item.key]
                                                                                     : percentValue;
-                                                                            const displayValue =
-                                                                                displayMode === "percent"
-                                                                                    ? adjustedPercentValue
-                                                                                    : totalRupeesByCustodianRef.current[custodianCode] * ((adjustedPercentValue ?? 0) / 100);
+                                                                            const displayValue = displayMode === "percent"
+                                                                                ? adjustedPercentValue
+                                                                                : totalRupeesByCustodianRef.current[custodianCode] * ((adjustedPercentValue ?? 0) / 100);
+                                                                            // ADD THIS DEBUGGING
+                                                                            if (item.key === "Cash" && custodianCode === "QFH0001") {
+                                                                                console.log('\n=== DISPLAY CALCULATION DEBUG ===');
+                                                                                console.log('Stock:', item.key);
+                                                                                console.log('Client:', custodianCode);
+                                                                                console.log('Percent value:', adjustedPercentValue);
+                                                                                console.log('Total portfolio:', totalRupeesByCustodianRef.current[custodianCode]);
+                                                                                console.log('Calculation:', `${totalRupeesByCustodianRef.current[custodianCode]} * (${adjustedPercentValue} / 100)`);
+                                                                                console.log('Result:', displayValue);
+                                                                                console.log('Formatted:', formatNumber(displayValue));
+                                                                                console.log('=== END DEBUG ===\n');
+                                                                            }
 
                                                                             if (tab === "change" && rowFilters[item.key] === "none") {
                                                                                 return (
@@ -1973,6 +2108,7 @@ export default function PmsAllocationTable() {
                                                 {formatPercent(calculateTotals(sortedSummaryData, true).totalPercent)}
                                             </td>
                                             <td className="p-3 text-right border-r border-gray-200">
+                                                {/* FIX: Use totals directly */}
                                                 {displayMode === "percent"
                                                     ? formatPercent(
                                                         Math.min(...filteredClients.map((custodianCode) =>
@@ -1980,10 +2116,11 @@ export default function PmsAllocationTable() {
                                                     )
                                                     : formatNumber(
                                                         Math.min(...filteredClients.map((custodianCode) =>
-                                                            calculateTotals(sortedSummaryData, true).clientTotals[custodianCode] * (totalRupeesByCustodianRef.current[custodianCode] / 100)))
+                                                            calculateTotals(sortedSummaryData, true).clientTotals[custodianCode]))
                                                     )}
                                             </td>
                                             <td className="p-3 text-right border-r border-gray-200">
+                                                {/* FIX: Use totals directly */}
                                                 {displayMode === "percent"
                                                     ? formatPercent(
                                                         Math.max(...filteredClients.map((custodianCode) =>
@@ -1991,29 +2128,34 @@ export default function PmsAllocationTable() {
                                                     )
                                                     : formatNumber(
                                                         Math.max(...filteredClients.map((custodianCode) =>
-                                                            calculateTotals(sortedSummaryData, true).clientTotals[custodianCode] * (totalRupeesByCustodianRef.current[custodianCode] / 100)))
+                                                            calculateTotals(sortedSummaryData, true).clientTotals[custodianCode]))
                                                     )}
                                             </td>
                                             <td className="p-3 text-right border-r border-gray-200">
                                                 {formatPercent(calculateTotals(sortedSummaryData, true).modelPercent)}
                                             </td>
-                                            {filteredClients.map((custodianCode) => (
-                                                <td
-                                                    key={custodianCode}
-                                                    className={`p-3 text-right font-bold border-r border-gray-200 ${tab === "change"
-                                                        ? calculateTotals(sortedSummaryData, true).clientTotals[custodianCode] > bufferValue
-                                                            ? "text-blue-500"
-                                                            : calculateTotals(sortedSummaryData, true).clientTotals[custodianCode] < -bufferValue
-                                                                ? "text-red-500"
+                                            {filteredClients.map((custodianCode) => {
+                                                const displayValue = calculateTotals(sortedSummaryData, true).clientTotals[custodianCode];
+
+                                                return (
+                                                    <td
+                                                        key={custodianCode}
+                                                        className={`p-3 text-right font-bold border-r border-gray-200 ${tab === "change"
+                                                                ? displayValue > bufferValue
+                                                                    ? "text-blue-500"
+                                                                    : displayValue < -bufferValue
+                                                                        ? "text-red-500"
+                                                                        : "text-gray-900"
                                                                 : "text-gray-900"
-                                                        : "text-gray-900"
-                                                        }`}
-                                                >
-                                                    {displayMode === "percent"
-                                                        ? formatPercent(calculateTotals(sortedSummaryData, true).clientTotals[custodianCode])
-                                                        : formatNumber(calculateTotals(sortedSummaryData, true).clientTotals[custodianCode] * (totalRupeesByCustodianRef.current[custodianCode] / 100))}
-                                                </td>
-                                            ))}
+                                                            }`}
+                                                    >
+                                                        {/* FIX: Use displayValue directly */}
+                                                        {displayMode === "percent"
+                                                            ? formatPercent(displayValue)
+                                                            : formatNumber(displayValue)}
+                                                    </td>
+                                                );
+                                            })}
                                         </tr>
                                     </>
                                 )}
