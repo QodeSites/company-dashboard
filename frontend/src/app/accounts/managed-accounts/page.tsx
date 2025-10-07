@@ -343,7 +343,7 @@ const ManagedAccounts = () => {
       {/* Quick Stats */}
       {accounts.length > 0 && (
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-          <ComponentCard className="p-6">
+          <ComponentCard title="" className="p-6">
             <div className="flex items-center gap-4">
               <div className="w-12 h-12 bg-green-100 dark:bg-green-900/20 rounded-lg flex items-center justify-center">
                 <svg className="w-6 h-6 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -359,7 +359,7 @@ const ManagedAccounts = () => {
             </div>
           </ComponentCard>
 
-          <ComponentCard className="p-6">
+          <ComponentCard title=""  className="p-6">
             <div className="flex items-center gap-4">
               <div className="w-12 h-12 bg-blue-100 dark:bg-blue-900/20 rounded-lg flex items-center justify-center">
                 <svg className="w-6 h-6 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -375,7 +375,7 @@ const ManagedAccounts = () => {
             </div>
           </ComponentCard>
 
-          <ComponentCard className="p-6">
+          <ComponentCard title="" className="p-6">
             <div className="flex items-center gap-4">
               <div className="w-12 h-12 bg-purple-100 dark:bg-purple-900/20 rounded-lg flex items-center justify-center">
                 <svg className="w-6 h-6 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
