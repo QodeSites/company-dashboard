@@ -314,7 +314,7 @@ const ManagedAccounts = () => {
                     )
                   ) : (
                     <TableRow>
-                      <TableCell colSpan={6} className="px-5 py-12 text-center">
+                      <TableCell className="px-5 py-12 text-center">
                         <div className="text-gray-500 dark:text-gray-400">
                           {searchTerm ? (
                             <div>
