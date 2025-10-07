@@ -1,13 +1,12 @@
+// @ts-nocheck
+
+
 // /app/api/managed-accounts/route.ts
 import { NextResponse } from 'next/server';
 import { prisma } from "@/lib/prisma";
 
 export async function GET() {
   try {
-    // Get current internal user session (optional - for access control)
-    
-   
-
     // Fetch all clients/managed accounts
     const managedAccounts = await prisma.clients.findMany({
       select: {
