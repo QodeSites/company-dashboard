@@ -13,6 +13,18 @@ const log = (level, message) => {
   console.log(`${new Date().toISOString()} - ${level} - ${message}`);
 };
 
+// CORS headers
+const corsHeaders = {
+  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Methods": "GET, POST, PUT, DELETE, OPTIONS",
+  "Access-Control-Allow-Headers": "Content-Type, Authorization",
+};
+
+// Handle OPTIONS request for CORS preflight
+export async function OPTIONS(req) {
+  return NextResponse.json({}, { headers: corsHeaders });
+}
+
 /**
  * Safely parse a numeric value, handling comma-separated numbers
  * @param {any} value - Value to parse
@@ -86,17 +98,26 @@ export async function POST(req) {
 
     if (!databaseName) {
       log("ERROR", "No database name provided.");
-      return NextResponse.json({ error: "Database name is required." }, { status: 400 });
+      return NextResponse.json(
+        { error: "Database name is required." },
+        { status: 400, headers: corsHeaders }
+      );
     }
 
     if (!strategyCode) {
       log("ERROR", "No strategy code provided.");
-      return NextResponse.json({ error: "Strategy code is required." }, { status: 400 });
+      return NextResponse.json(
+        { error: "Strategy code is required." },
+        { status: 400, headers: corsHeaders }
+      );
     }
 
     if (!file || !(file instanceof File)) {
       log("ERROR", "No file uploaded or invalid file.");
-      return NextResponse.json({ error: "No file uploaded or invalid file." }, { status: 400 });
+      return NextResponse.json(
+        { error: "No file uploaded or invalid file." },
+        { status: 400, headers: corsHeaders }
+      );
     }
 
     // Validate file type
@@ -104,7 +125,10 @@ export async function POST(req) {
     const fileExtension = fileName.split(".").pop().toLowerCase();
     if (!["csv", "xlsx", "xls"].includes(fileExtension)) {
       log("ERROR", `Unsupported file format: ${fileExtension}`);
-      return NextResponse.json({ error: "Unsupported file format. Please upload a CSV or Excel file." }, { status: 400 });
+      return NextResponse.json(
+        { error: "Unsupported file format. Please upload a CSV or Excel file." },
+        { status: 400, headers: corsHeaders }
+      );
     }
 
     log("INFO", `Received file: ${fileName}, extension: ${fileExtension}, database: ${databaseName}, strategy: ${strategyCode}`);
@@ -147,7 +171,10 @@ export async function POST(req) {
 
     if (!accounts.length) {
       log("ERROR", "No accounts found in header row.");
-      return NextResponse.json({ error: "No accounts found in header row. Check file header format." }, { status: 400 });
+      return NextResponse.json(
+        { error: "No accounts found in header row. Check file header format." },
+        { status: 400, headers: corsHeaders }
+      );
     }
 
     log("INFO", `Found ${accounts.length} accounts: ${JSON.stringify(accounts)}`);
@@ -173,7 +200,10 @@ export async function POST(req) {
       log("ERROR", `CSV parsing error: ${parseError.message}`);
       const problematicLine = lines[6];
       log("DEBUG", `Problematic line (line 7): ${problematicLine}`);
-      return NextResponse.json({ error: `CSV parsing error: ${parseError.message}` }, { status: 400 });
+      return NextResponse.json(
+        { error: `CSV parsing error: ${parseError.message}` },
+        { status: 400, headers: corsHeaders }
+      );
     }
 
     // Process data
@@ -242,7 +272,10 @@ export async function POST(req) {
 
     if (!allData.length) {
       log("ERROR", "No data generated after processing file.");
-      return NextResponse.json({ error: "No data generated from file." }, { status: 400 });
+      return NextResponse.json(
+        { error: "No data generated from file." },
+        { status: 400, headers: corsHeaders }
+      );
     }
 
     log("DEBUG", `First item: ${JSON.stringify(allData[0])}`);
@@ -291,7 +324,7 @@ export async function POST(req) {
           row.SymbolName,
           row.AssetClass,
           row.Sector || null,
-          strategyCode, // Use the provided strategy_code
+          strategyCode,
           qcode,
           row.AccountID,
           row.TotalPercentage || 0.0,
@@ -311,7 +344,10 @@ export async function POST(req) {
     } catch (dbError) {
       await client.query("ROLLBACK");
       log("ERROR", `Error inserting data: ${dbError.message}`);
-      return NextResponse.json({ error: `Database error: ${dbError.message}` }, { status: 500 });
+      return NextResponse.json(
+        { error: `Database error: ${dbError.message}` },
+        { status: 500, headers: corsHeaders }
+      );
     } finally {
       client.release();
       await pool.end();
@@ -320,9 +356,15 @@ export async function POST(req) {
     // Log sample data for debugging (first 10 rows)
     console.log(allData.slice(0, 10));
 
-    return NextResponse.json({ message: `Successfully processed and inserted ${allData.length} rows for strategy ${strategyCode}.` }, { status: 200 });
+    return NextResponse.json(
+      { message: `Successfully processed and inserted ${allData.length} rows for strategy ${strategyCode}.` },
+      { status: 200, headers: corsHeaders }
+    );
   } catch (error) {
     log("ERROR", `Error processing request: ${error.message}`);
-    return NextResponse.json({ error: `Server error: ${error.message}` }, { status: 500 });
+    return NextResponse.json(
+      { error: `Server error: ${error.message}` },
+      { status: 500, headers: corsHeaders }
+    );
   }
 }
