@@ -6,7 +6,7 @@ interface Option {
 }
 
 interface SelectProps {
-  options: Option[];
+  options?: Option[];
   placeholder?: string;
   onChange: (value: string) => void;
   className?: string;
@@ -50,7 +50,7 @@ const Select: React.FC<SelectProps> = ({
       <option value="" disabled className="text-gray-700 dark:bg-gray-900 dark:text-gray-400">
         {placeholder}
       </option>
-      {options.map((option) => (
+      {options?.map((option) => (
         <option
           key={option.value}
           value={option.value}

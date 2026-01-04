@@ -199,20 +199,25 @@ export default function CreateAccountPage() {
     }
   };
 
-  const brokerOptions =
-    formData.account_type === "pms"
-      ? [
-          { value: "zerodha", label: "Zerodha" },
-          { value: "emkay", label: "Emkay" },
-        ]
-      : formData.account_type === "managed_account" || formData.account_type === "prop"
-      ? [
-          { value: "zerodha", label: "Zerodha" },
-          { value: "jainam", label: "Jainam" },
-          { value: "marwadi", label: "Marwadi" },
-          { value: "sre", label: "SRE" },
-        ]
-      : [];
+const brokerOptions =
+  formData.account_type === "pms"
+    ? [
+        { value: "zerodha", label: "Zerodha" },
+        { value: "emkay", label: "Emkay" },
+      ]
+    : formData.account_type === "managed_account" || formData.account_type === "prop"
+    ? [
+        { value: "zerodha", label: "Zerodha" },
+        { value: "jainam", label: "Jainam" },
+        { value: "marwadi", label: "Marwadi" },
+        { value: "sre", label: "SRE" },
+        { value: "affluence", label: "Affluence" },
+        { value: "radiance", label: "Radiance" },
+        { value: "nuvama", label: "Nuvama" },
+        { value: "ashika", label: "Ashika" },
+        { value: "siyab", label: "Siyab" },
+      ]
+    : [];
 
   const strategyOptions = [
     { value: "QAW+", label: "QAW+" },

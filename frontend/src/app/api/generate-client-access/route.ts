@@ -29,7 +29,7 @@ export async function POST(request: NextRequest) {
     console.log('Generated token for client:', clientId);
 
     // Create access URL - make sure this matches your portfolio app domain
-    const accessUrl = `https://portfolio.qodeinvest.com/api/auth/internal-access?token=${token}`;
+    const accessUrl = `https://f2lxldmp-2030.inc1.devtunnels.ms/api/auth/internal-access?token=${token}`;
 
     return NextResponse.json({ 
       success: true, 

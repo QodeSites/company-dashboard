@@ -60,7 +60,7 @@ function ClientAccessButton({ icode, userName }: ClientAccessButtonProps) {
 
   return (
     <div className="flex flex-col gap-2">
-      <button
+      {/* <button
         onClick={handleAccessClient}
         disabled={loading}
         className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
@@ -69,7 +69,7 @@ function ClientAccessButton({ icode, userName }: ClientAccessButtonProps) {
       </button>
       {error && (
         <span className="text-red-500 text-sm">{error}</span>
-      )}
+      )} */}
     </div>
   );
 }
@@ -77,6 +77,7 @@ function ClientAccessButton({ icode, userName }: ClientAccessButtonProps) {
 export default function AccountsTable() {
   const [accounts, setAccounts] = useState<Account[]>([]);
   const [isDeleting, setIsDeleting] = useState<string | null>(null);
+  const [selectedFilter, setSelectedFilter] = useState<string>("all");
 
   useEffect(() => {
     const fetchAccounts = async () => {
@@ -94,6 +95,12 @@ export default function AccountsTable() {
     };
     fetchAccounts();
   }, []);
+
+  // Filter accounts based on selected type
+  const filteredAccounts = accounts.filter((acc) => {
+    if (selectedFilter === "all") return true;
+    return acc.account_type.toLowerCase() === selectedFilter.toLowerCase();
+  });
 
   const handleDelete = async (qcode: string) => {
     if (!confirm(`Are you sure you want to delete account ${qcode}? This action cannot be undone.`)) {
@@ -134,6 +141,38 @@ export default function AccountsTable() {
 
   return (
     <div className="space-y-6">
+      {/* Filter Buttons */}
+      <div className="flex gap-3 flex-wrap">
+        <Button
+          variant={selectedFilter === "all" ? "primary" : "secondary"}
+          size="sm"
+          onClick={() => setSelectedFilter("all")}
+        >
+          All Accounts ({accounts.length})
+        </Button>
+        <Button
+          variant={selectedFilter === "managed_account" ? "primary" : "secondary"}
+          size="sm"
+          onClick={() => setSelectedFilter("managed_account")}
+        >
+          Managed Accounts ({accounts.filter(a => a.account_type.toLowerCase() === "managed_account").length})
+        </Button>
+        <Button
+          variant={selectedFilter === "prop" ? "primary" : "secondary"}
+          size="sm"
+          onClick={() => setSelectedFilter("prop")}
+        >
+          Prop ({accounts.filter(a => a.account_type.toLowerCase() === "prop").length})
+        </Button>
+        <Button
+          variant={selectedFilter === "pms" ? "primary" : "secondary"}
+          size="sm"
+          onClick={() => setSelectedFilter("pms")}
+        >
+          PMS ({accounts.filter(a => a.account_type.toLowerCase() === "pms").length})
+        </Button>
+      </div>
+
       {/* Main Accounts Table */}
       <ComponentCard title="All Accounts" className="p-0">
         <div className="overflow-hidden rounded-xl border border-gray-200 bg-white dark:border-white/[0.05] dark:bg-white/[0.03]">
@@ -150,7 +189,7 @@ export default function AccountsTable() {
                   </TableRow>
                 </TableHeader>
                 <TableBody className="divide-y divide-gray-100 dark:divide-white/[0.05]">
-                  {accounts.map((acc) => (
+                  {filteredAccounts.map((acc) => (
                     <TableRow key={acc.id}>
                       <TableCell className="px-5 py-4 text-theme-sm text-gray-700 dark:text-white/90">{acc.account_name}</TableCell>
                       <TableCell className="px-5 py-4 text-theme-sm text-gray-700 dark:text-white/90">{acc.qcode}</TableCell>

@@ -362,5 +362,143 @@
         "fieldName": "percent_pnl"
       }
     ]
+  },
+  "equity_holding_test": {
+    "displayName": "Equity Holdings Test",
+    "dateField": "date",
+    "requiredColumns": [
+      {
+        "displayName": "Symbol",
+        "fieldName": "symbol"
+      },
+      {
+        "displayName": "Mastersheet Tag",
+        "fieldName": "mastersheet_tag"
+      },
+      {
+        "displayName": "Exchange",
+        "fieldName": "exchange"
+      },
+      {
+        "displayName": "Quantity",
+        "fieldName": "quantity"
+      },
+      {
+        "displayName": "Avg Price",
+        "fieldName": "avg_price",
+        "aliases": [
+          "Average Price",
+          "Avg Cost"
+        ]
+      },
+      {
+        "displayName": "Broker",
+        "fieldName": "broker"
+      },
+      {
+        "displayName": "Debt/Equity",
+        "fieldName": "debt_equity"
+      },
+      {
+        "displayName": "Sub Category",
+        "fieldName": "sub_category"
+      },
+      {
+        "displayName": "LTP",
+        "fieldName": "ltp"
+      },
+      {
+        "displayName": "Buy Value",
+        "fieldName": "buy_value"
+      },
+      {
+        "displayName": "Value as of Today",
+        "fieldName": "value_as_of_today"
+      },
+      {
+        "displayName": "PNL Amount",
+        "fieldName": "pnl_amount",
+        "aliases": [
+          "PNL Amount"
+        ]
+      },
+      {
+        "displayName": "% PNL",
+        "fieldName": "percent_pnl"
+      }
+    ]
+  },
+  "mutual_fund_holding_sheet_test": {
+    "displayName": "Mutual Fund Holding Test",
+    "dateField": "as_of_date",
+    "requiredColumns": [
+      {
+        "displayName": "As of Date",
+        "fieldName": "as_of_date",
+        "aliases": [
+          "Date"
+        ]
+      },
+      {
+        "displayName": "Symbol",
+        "fieldName": "symbol"
+      },
+      {
+        "displayName": "ISIN",
+        "fieldName": "isin"
+      },
+      {
+        "displayName": "Scheme Code",
+        "fieldName": "scheme_code"
+      },
+      {
+        "displayName": "Quantity",
+        "fieldName": "quantity"
+      },
+      {
+        "displayName": "Avg Price",
+        "fieldName": "avg_price",
+        "aliases": [
+          "Average Price",
+          "Price"
+        ]
+      },
+      {
+        "displayName": "Broker",
+        "fieldName": "broker"
+      },
+      {
+        "displayName": "Debt/Equity",
+        "fieldName": "debt_equity"
+      },
+      {
+        "displayName": "Mastersheet Tag",
+        "fieldName": "mastersheet_tag"
+      },
+      {
+        "displayName": "Sub Category",
+        "fieldName": "sub_category"
+      },
+      {
+        "displayName": "NAV",
+        "fieldName": "nav"
+      },
+      {
+        "displayName": "Buy Value",
+        "fieldName": "buy_value"
+      },
+      {
+        "displayName": "Value as of Today",
+        "fieldName": "value_as_of_today"
+      },
+      {
+        "displayName": "PNL Amount",
+        "fieldName": "pnl_amount"
+      },
+      {
+        "displayName": "% PNL",
+        "fieldName": "percent_pnl"
+      }
+    ]
   }
 }

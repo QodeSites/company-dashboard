@@ -38,6 +38,8 @@ const navItems: NavItem[] = [
       { name: "Dashboard", path: "/accounts" },
       { name: "Create Account", path: "/accounts/create" },
       { name: "Upload Mastersheet", path: "/accounts/master-upload" },
+      { name: "Upload Equity Holdings", path: "/accounts/equity-holdings-upload" },
+      { name: "Upload Mutual Funds", path: "/accounts/mutual-fund-upload" },
       { name: "Add User to Account", path: "/accounts/add-user" },
       { name: "Link Accounts", path: "/accounts/link-account" },
     ],

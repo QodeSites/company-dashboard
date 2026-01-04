@@ -13,7 +13,7 @@ export interface TableDefinition {
 }
 
 export const sharedTableConfigs: Record<string, TableDefinition> = {
-  master_sheet: {
+  master_sheet_test: {
     displayName: "Master Sheet",
     dateField: "date",
     requiredColumns: [

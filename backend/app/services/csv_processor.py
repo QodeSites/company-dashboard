@@ -103,12 +103,18 @@ def process_csv(
         "mutual_fund_holding",
         "capital_in_out",
         "equity_holding",
+        "equity_holding_test",
+        "mutual_fund_holding_sheet_test",
     } and "Status" in effective_required:
         effective_required.remove("Status")
-    
-    # For equity_holding, Date is always set programmatically, so remove from required
-    if table_name == "equity_holding" and "Date" in effective_required:
+
+    # For equity_holding and equity_holding_test, Date is always set programmatically, so remove from required
+    if table_name in ("equity_holding", "equity_holding_test") and "Date" in effective_required:
         effective_required.remove("Date")
+
+    # Scheme Code is optional for mutual_fund_holding_sheet_test
+    if table_name == "mutual_fund_holding_sheet_test" and "Scheme Code" in effective_required:
+        effective_required.remove("Scheme Code")
 
     # If required columns missing, try a safer re-parse with comma (common Excel)
     if not all(col in normalized_fieldnames for col in effective_required):
@@ -134,8 +140,8 @@ def process_csv(
             f"\nDetected columns: {normalized_fieldnames}"
         )
 
-    # Date field (display label) - Skip for equity_holding as date is set programmatically
-    if table_name != "equity_holding":
+    # Date field (display label) - Skip for equity_holding and equity_holding_test as date is set programmatically
+    if table_name not in ("equity_holding", "equity_holding_test"):
         date_field = SHARED_TABLE_CONFIGS[table_name].get("dateField", "Date")
         date_field_display = next(
             (col["displayName"] for col in SHARED_TABLE_CONFIGS[table_name]["requiredColumns"]
@@ -167,6 +173,12 @@ def process_csv(
         "equity_holding": [
             "Quantity", "Avg Price", "LTP", "Buy Value", "Value as of Today", "PNL Amount"
         ],
+        "equity_holding_test": [
+            "Quantity", "Avg Price", "LTP", "Buy Value", "Value as of Today", "PNL Amount"
+        ],
+        "mutual_fund_holding_sheet_test": [
+            "Quantity", "Avg Price", "NAV", "Buy Value", "Value as of Today", "PNL Amount"
+        ],
         "capital_in_out": ["Capital In/Out"],
     }.get(table_name, [])
 
@@ -184,12 +196,13 @@ def process_csv(
             if table_name in {
                 "tradebook", "slippage", "mutual_fund_holding",
                 "gold_tradebook", "liquidbees_tradebook",
-                "capital_in_out", "equity_holding"
+                "capital_in_out", "equity_holding", "equity_holding_test",
+                "mutual_fund_holding_sheet_test"
             } and "Status" not in normalized_row:
                 normalized_row["Status"] = "P"
 
-            # Date parse - Skip for equity_holding as date is set programmatically
-            if table_name != "equity_holding":
+            # Date parse - Skip for equity_holding and equity_holding_test as date is set programmatically
+            if table_name not in ("equity_holding", "equity_holding_test"):
                 date_str = normalized_row.get(date_field_display, "").strip()
                 if not date_str:
                     raise ValueError(f"Missing date in '{date_field_display}' at row {row_num}")
@@ -222,8 +235,8 @@ def process_csv(
                     except InvalidOperation:
                         raise ValueError(f"Invalid decimal value in '{field}' at row {row_num}: {raw}")
 
-            # Special handling for % PNL in equity_holding
-            if table_name == "equity_holding":
+            # Special handling for % PNL in equity_holding and test tables
+            if table_name in ("equity_holding", "equity_holding_test", "mutual_fund_holding_sheet_test"):
                 percent_pnl = normalized_row.get("% PNL", "")
                 if percent_pnl and percent_pnl.lower() not in ["inf", "-inf"]:
                     try:

@@ -40,34 +40,20 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // Validate broker based on account_type
-    const validBrokers = {
-      pms: ['zerodha', 'emkay'],
-      managed_account: ['zerodha', 'jainam', 'marwadi', 'sre'],
-      prop: ['zerodha', 'jainam', 'marwadi', 'sre'],
-    };
-    if (!validBrokers[account_type].includes(broker)) {
-      return NextResponse.json(
-        {
-          message: `Invalid broker for ${account_type}. Must be one of: ${validBrokers[account_type].join(', ')}`,
-        },
-        { status: 400 }
-      );
-    }
 
-    // Validate strategy for managed_account
+    // Validate strategy for managed_account and prop accounts
     if (account_type === 'managed_account') {
       const validStrategies = ['QAW+', 'QAW++', 'QTF+', 'QTF++', 'QYE+', 'QYE++'];
       if (!strategy || !validStrategies.includes(strategy)) {
         return NextResponse.json(
-          { message: `Strategy is required for managed_account and must be one of: ${validStrategies.join(', ')}` },
+          { message: `Strategy is required for ${account_type} and must be one of: ${validStrategies.join(', ')}` },
           { status: 400 }
         );
       }
     } else if (strategy) {
-      // Ensure strategy is null for non-managed accounts
+      // Ensure strategy is null for PMS accounts
       return NextResponse.json(
-        { message: 'Strategy can only be set for managed_account types' },
+        { message: 'Strategy can only be set for managed_account or prop types' },
         { status: 400 }
       );
     }
@@ -148,7 +134,7 @@ export async function POST(req: NextRequest) {
         qcode: newQcode,
         account_id: randomUUID(),
         api_details,
-        strategy: account_type === 'managed_account' ? strategy : null, // Set strategy for managed_account, null otherwise
+        strategy: (account_type === 'managed_account' || account_type === 'prop') ? strategy : null,
       };
 
       // Create the account
@@ -179,13 +165,14 @@ export async function POST(req: NextRequest) {
         access_level?: string;
       }
 
-      let totalAmount = 0;
-      if (account_type === 'prop') {
-        totalAmount = user_allocations.reduce(
-          (sum: number, u: UserAllocation) => sum + parseFloat(u.amount?.toString() || '0'),
-          0
-        );
-      }
+      // Commented out: Prop-specific amount calculation logic
+      // let totalAmount = 0;
+      // if (account_type === 'prop') {
+      //   totalAmount = user_allocations.reduce(
+      //     (sum: number, u: UserAllocation) => sum + parseFloat(u.amount?.toString() || '0'),
+      //     0
+      //   );
+      // }
 
       for (const alloc of user_allocations) {
         const { icode, date, amount, access_level } = alloc;
@@ -194,17 +181,18 @@ export async function POST(req: NextRequest) {
           throw new Error('Each allocation must have icode');
         }
 
-        if (account_type === 'prop') {
-          if (!amount || !access_level) {
-            throw new Error(
-              `Amount and access_level are required for prop account allocations (user ${icode})`
-            );
-          }
-          const allocationAmount = parseFloat(amount.toString());
-          if (isNaN(allocationAmount)) {
-            throw new Error(`Invalid amount for user ${icode}`);
-          }
-        }
+        // Commented out: Prop-specific validation logic
+        // if (account_type === 'prop') {
+        //   if (!amount || !access_level) {
+        //     throw new Error(
+        //       `Amount and access_level are required for prop account allocations (user ${icode})`
+        //     );
+        //   }
+        //   const allocationAmount = parseFloat(amount.toString());
+        //   if (isNaN(allocationAmount)) {
+        //     throw new Error(`Invalid amount for user ${icode}`);
+        //   }
+        // }
 
         const user = await tx.clients.findUnique({ where: { icode } });
         if (!user) {
@@ -215,13 +203,16 @@ export async function POST(req: NextRequest) {
           data: {
             qcode: newQcode,
             icode,
-            access_level: account_type === 'prop' ? access_level! : 'read',
+            // Commented out: Prop-specific access level logic
+            // access_level: account_type === 'prop' ? access_level! : 'read',
+            access_level: 'read',
           },
         });
 
-        const allocationAmount = account_type === 'prop' ? parseFloat(amount!.toString()) : 0;
-        const allocationPercent =
-          account_type === 'prop' && totalAmount !== 0 ? (allocationAmount / totalAmount) * 100 : 0;
+        // Commented out: Prop-specific amount and allocation percent logic
+        // const allocationAmount = account_type === 'prop' ? parseFloat(amount!.toString()) : 0;
+        // const allocationPercent =
+        //   account_type === 'prop' && totalAmount !== 0 ? (allocationAmount / totalAmount) * 100 : 0;
 
         await tx.pooled_account_allocations.upsert({
           where: {
@@ -232,15 +223,19 @@ export async function POST(req: NextRequest) {
             },
           },
           update: {
-            contribution_amount: allocationAmount,
-            allocation_percent: allocationPercent,
+            // contribution_amount: allocationAmount,
+            // allocation_percent: allocationPercent,
+            contribution_amount: 0,
+            allocation_percent: 0,
           },
           create: {
             qcode: newQcode,
             icode,
             allocation_date: new Date(),
-            contribution_amount: allocationAmount,
-            allocation_percent: allocationPercent,
+            // contribution_amount: allocationAmount,
+            // allocation_percent: allocationPercent,
+            contribution_amount: 0,
+            allocation_percent: 0,
           },
         });
       }
@@ -332,13 +327,6 @@ export async function GET(req: NextRequest) {
       },
     });
 
-    if (!accounts.length) {
-      return NextResponse.json(
-        { message: `No accounts found${accountType ? ` for type ${accountType}` : ''}` },
-        { status: 404 }
-      );
-    }
-
     return NextResponse.json({ accounts });
   } catch (error: unknown) {
     const errorMessage = error instanceof Error ? error.message : 'An unexpected error occurred';
@@ -373,12 +361,12 @@ export async function PUT(req: NextRequest) {
       );
     }
 
-    // Validate strategy for managed_account
-    if (account_type === 'managed_account') {
+    // Validate strategy for managed_account and prop accounts
+    if (account_type === 'managed_account' ) {
       const validStrategies = ['QAW+', 'QAW++', 'QTF+', 'QTF++', 'QYE+', 'QYE++'];
       if (!strategy || !validStrategies.includes(strategy)) {
         return NextResponse.json(
-          { message: `Strategy is required for managed_account and must be one of: ${validStrategies.join(', ')}` },
+          { message: `Strategy is required for ${account_type} and must be one of: ${validStrategies.join(', ')}` },
           { status: 400 }
         );
       }
@@ -393,11 +381,11 @@ export async function PUT(req: NextRequest) {
       ...filteredUpdateData
     } = updateData;
 
-    // Ensure strategy is set to null for non-managed accounts
+    // Ensure strategy is set to null for PMS accounts
     const finalUpdateData = {
       ...filteredUpdateData,
       account_type: account_type || existingAccount.account_type,
-      strategy: account_type === 'managed_account' ? strategy : null,
+      strategy: (account_type === 'managed_account' || account_type === 'prop') ? strategy : null,
     };
 
     // Update the account with filtered data

@@ -256,20 +256,21 @@ export default function PropsAndManagedAccount({ qcode }: PropsAndManagedAccount
     const accountType: string | undefined =
         editForm?.account_type || accountDetails?.account_type;
 
-    const brokerOptions =
-        accountType === "pms"
+    const brokerOptions = accountType === "pms"
+        ? [
+            { value: "zerodha", label: "Zerodha" },
+            { value: "emkay", label: "Emkay" },
+        ]
+        : accountType === "managed_account" || accountType === "prop"
             ? [
                 { value: "zerodha", label: "Zerodha" },
-                { value: "emkay", label: "Emkay" },
+                { value: "jainam", label: "Jainam" },
+                { value: "marwadi", label: "Marwadi" },
+                { value: "sre", label: "SRE" },
+                { value: "radiance", label: "Radiance" },
+                { value: "affluence", label: "Affluence" }
             ]
-            : accountType === "managed_account" || accountType === "prop"
-                ? [
-                    { value: "zerodha", label: "Zerodha" },
-                    { value: "jainam", label: "Jainam" },
-                    { value: "marwadi", label: "Marwadi" },
-                    { value: "sre", label: "SRE" },
-                ]
-                : [];
+            : [] as Array<{ value: string; label: string }>;
 
 
     const fetchChartData = async () => {
@@ -761,6 +762,24 @@ export default function PropsAndManagedAccount({ qcode }: PropsAndManagedAccount
         console.log(`Exported ${tableName} data to Excel:`, `${qcode}_${tableName}.xlsx`);
     };
 
+    const exportFailedRows = (tableName: string) => {
+        const failedRows = operationResult[tableName]?.failedRows;
+        if (!failedRows || failedRows.length === 0) {
+            alert("No failed rows to export");
+            return;
+        }
+        const formattedData = failedRows.map((failedRow) => ({
+            "Row Index": failedRow.rowIndex,
+            "Error": failedRow.error,
+            ...failedRow.row
+        }));
+        const worksheet = XLSX.utils.json_to_sheet(formattedData);
+        const workbook = XLSX.utils.book_new();
+        XLSX.utils.book_append_sheet(workbook, worksheet, "Failed Rows");
+        XLSX.writeFile(workbook, `${qcode}_${tableName}_failed_rows.xlsx`);
+        console.log(`Exported failed rows for ${tableName}:`, `${qcode}_${tableName}_failed_rows.xlsx`);
+    };
+
     const handleSort = (tableName: string, key: string) => {
         setSortConfig((prev) => {
             const currentSort = prev[tableName];
@@ -869,7 +888,7 @@ export default function PropsAndManagedAccount({ qcode }: PropsAndManagedAccount
     useEffect(() => {
         fetchTableData("equity_holding");
     }, [qcode, page.equity_holding, search.equity_holding, filterStartDate.equity_holding, filterEndDate.equity_holding, pageSize]);
-
+    console.log(fileInputRefs,"fileInputRefs=======")
 
     const tabs = Object.keys(tableConfigs).map((tableName) => ({
         name: tableConfigs[tableName].displayName,
@@ -1018,7 +1037,7 @@ export default function PropsAndManagedAccount({ qcode }: PropsAndManagedAccount
                                     Export to Excel
                                 </button>
                             </div>
-                            {csvPreviews[tableName].length > 0 && (
+                            {csvPreviews[tableName]?.length > 0 && (
                                 <>
                                     <h4 className="text-sm font-medium text-gray-600 dark:text-gray-300 mt-4 mb-2">CSV Preview</h4>
                                     <pre className="text-xs text-gray-700 dark:text-gray-200 bg-gray-100 dark:bg-gray-700 p-3 rounded-lg overflow-x-auto">
@@ -1055,29 +1074,29 @@ export default function PropsAndManagedAccount({ qcode }: PropsAndManagedAccount
 
                                 {/* Detailed Statistics */}
                                 <div className="mt-3 grid grid-cols-1 md:grid-cols-4 gap-4 text-sm">
-                                    {operationResult[tableName]!.total_rows && (
+                                    {operationResult[tableName]!.totalRows && (
                                         <div className="bg-white dark:bg-gray-700 p-3 rounded border">
                                             <span className="font-medium text-gray-600 dark:text-gray-300">Total Rows:</span>
                                             <span className="ml-2 text-lg font-bold text-blue-600 dark:text-blue-400">
-                                                {operationResult[tableName]!.total_rows}
+                                                {operationResult[tableName]!.totalRows}
                                             </span>
                                         </div>
                                     )}
 
-                                    {operationResult[tableName]!.inserted_rows !== undefined && (
+                                    {operationResult[tableName]!.insertedRows !== undefined && (
                                         <div className="bg-white dark:bg-gray-700 p-3 rounded border">
                                             <span className="font-medium text-gray-600 dark:text-gray-300">Successful:</span>
                                             <span className="ml-2 text-lg font-bold text-green-600 dark:text-green-400">
-                                                {operationResult[tableName]!.inserted_rows}
+                                                {operationResult[tableName]!.insertedRows}
                                             </span>
                                         </div>
                                     )}
 
-                                    {operationResult[tableName]!.failed_rows && (
+                                    {operationResult[tableName]!.failedRows && (
                                         <div className="bg-white dark:bg-gray-700 p-3 rounded border">
                                             <span className="font-medium text-gray-600 dark:text-gray-300">Failed:</span>
                                             <span className="ml-2 text-lg font-bold text-red-600 dark:text-red-400">
-                                                {operationResult[tableName]!.failed_rows!.length}
+                                                {operationResult[tableName]!.failedRows!.length}
                                             </span>
                                         </div>
                                     )}
@@ -1094,14 +1113,14 @@ export default function PropsAndManagedAccount({ qcode }: PropsAndManagedAccount
                             </div>
 
                             {/* Failed Rows Detail Section */}
-                            {operationResult[tableName]!.failed_rows && operationResult[tableName]!.failed_rows!.length > 0 && (
+                            {operationResult[tableName]?.failedRows && operationResult[tableName].failedRows.length > 0 && (
                                 <div className="border border-red-200 dark:border-red-800 rounded-lg overflow-hidden">
                                     <div className="bg-red-50 dark:bg-red-900/20 px-4 py-3 border-b border-red-200 dark:border-red-800">
                                         <h4 className="font-semibold text-red-800 dark:text-red-300 flex items-center gap-2">
                                             <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
                                                 <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
                                             </svg>
-                                            Failed Rows ({operationResult[tableName]!.failed_rows!.length} total)
+                                            Failed Rows ({operationResult[tableName]!.failedRows!.length} total)
                                         </h4>
                                         <p className="text-sm text-red-700 dark:text-red-400 mt-1">
                                             The following rows could not be processed. Review the errors and fix your CSV file.
@@ -1131,12 +1150,12 @@ export default function PropsAndManagedAccount({ qcode }: PropsAndManagedAccount
                                                     </tr>
                                                 </thead>
                                                 <tbody className="bg-white dark:bg-gray-800 divide-y divide-red-100 dark:divide-red-900">
-                                                    {operationResult[tableName]!.failed_rows!.map((failedRow, index) => {
+                                                    {operationResult[tableName]!.failedRows!.map((failedRow, index) => {
                                                         const parsedError = parseErrorMessage(failedRow.error);
                                                         return (
                                                             <tr key={index} className="hover:bg-red-25 dark:hover:bg-red-900/10">
                                                                 <td className="px-4 py-3 whitespace-nowrap text-sm font-mono text-red-900 dark:text-red-100">
-                                                                    {failedRow.row_index}
+                                                                    {failedRow.rowIndex}
                                                                 </td>
                                                                 <td className="px-4 py-3 whitespace-nowrap text-sm text-red-800 dark:text-red-200">
                                                                     {parsedError.field && (
@@ -1180,29 +1199,29 @@ export default function PropsAndManagedAccount({ qcode }: PropsAndManagedAccount
                             )}
 
                             {/* Export Failed Rows Button */}
-                            {operationResult[tableName]!.failed_rows && operationResult[tableName]!.failed_rows!.length > 0 && (
+                            {operationResult[tableName]?.failedRows && operationResult[tableName].failedRows.length > 0 && (
                                 <div className="flex justify-end">
                                     <button
                                         onClick={() => exportFailedRows(tableName)}
                                         className="px-4 py-2 text-sm font-medium text-white bg-red-600 rounded-lg hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-offset-2"
                                     >
-                                        Export Failed Rows to Excel ({operationResult[tableName]!.failed_rows!.length} rows)
+                                        Export Failed Rows to Excel ({operationResult[tableName]!.failedRows!.length} rows)
                                     </button>
                                 </div>
                             )}
 
                             {/* CSV Columns Section */}
-                            {operationResult[tableName]!.column_names && operationResult[tableName]!.column_names!.length > 0 && (
+                            {operationResult[tableName]!.columnNames && operationResult[tableName]!.columnNames!.length > 0 && (
                                 <div className="border border-blue-200 dark:border-blue-800 rounded-lg p-4">
                                     <h4 className="font-medium text-blue-800 dark:text-blue-300 mb-2 flex items-center gap-2">
                                         <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
                                             <path fillRule="evenodd" d="M3 4a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm0 4a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm0 4a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm0 4a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1z" clipRule="evenodd" />
                                         </svg>
-                                        CSV Columns Detected ({operationResult[tableName]!.column_names!.length})
+                                        CSV Columns Detected ({operationResult[tableName]!.columnNames!.length})
                                     </h4>
                                     <div className="bg-blue-50 dark:bg-blue-900/20 p-3 rounded-lg border border-blue-200 dark:border-blue-800">
                                         <div className="flex flex-wrap gap-2">
-                                            {operationResult[tableName]!.column_names!.map((column, index) => (
+                                            {operationResult[tableName]!.columnNames!.map((column, index) => (
                                                 <span
                                                     key={index}
                                                     className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 dark:bg-blue-800 text-blue-800 dark:text-blue-200"
@@ -1303,7 +1322,7 @@ export default function PropsAndManagedAccount({ qcode }: PropsAndManagedAccount
                                             </TableRow>
                                         </TableHeader>
                                         <TableBody className="divide-y divide-gray-100 dark:divide-gray-700">
-                                            {sheetData[tableName].length > 0 ? (
+                                            {sheetData[tableName]?.length > 0 ? (
                                                 sheetData[tableName].map((row) => (
                                                     <TableRow key={row.id}>
                                                         {tableConfigs[tableName].requiredColumns.map((col) => {
@@ -1408,9 +1427,9 @@ export default function PropsAndManagedAccount({ qcode }: PropsAndManagedAccount
                                     value={editForm.broker ?? ""}
                                     onChange={(v) => handleEditChange("broker", v)}
                                     placeholder="Select Broker"
-                                    disabled={brokerOptions.length === 0}
+                                    disabled={!brokerOptions || brokerOptions.length === 0}
                                 />
-                                {brokerOptions.length === 0 && (
+                                {(!brokerOptions || brokerOptions.length === 0) && (
                                     <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
                                         Please select an account type first to see broker options
                                     </p>

@@ -194,7 +194,7 @@ async def replace_master_sheet(
     db: Prisma
 ):
     start_time = time.time()
-    logger.debug(f"Received replace request for master_sheet: qcode={qcode}, file={file.filename}")
+    logger.debug(f"Received replace request for master_sheet_test: qcode={qcode}, file={file.filename}")
 
     try:
         # Validate inputs
@@ -213,14 +213,14 @@ async def replace_master_sheet(
             SELECT EXISTS (
                 SELECT FROM information_schema.tables 
                 WHERE table_schema = 'public' 
-                AND table_name = 'master_sheet'
+                AND table_name = 'master_sheet_test'
             ) as exists
             """
         )
 
         if not table_exists or not table_exists["exists"]:
-            logger.error("Table master_sheet does not exist")
-            raise HTTPException(status_code=400, detail="Table master_sheet does not exist")
+            logger.error("Table master_sheet_test does not exist")
+            raise HTTPException(status_code=400, detail="Table master_sheet_test does not exist")
 
         # Check user access to qcode
         account = await db.accounts.find_first(where={"qcode": qcode})
@@ -234,21 +234,21 @@ async def replace_master_sheet(
             logger.error("Uploaded file is empty")
             raise HTTPException(status_code=400, detail="Uploaded file is empty")
         
-        data, failed_rows = process_csv(content, qcode, "master_sheet", None, None)
+        data, failed_rows = process_csv(content, qcode, "master_sheet_test", None, None)
 
         # Replace data (delete all existing and insert new)
-        success_count, insert_failed_rows = await replace_data(db, data, "master_sheet", qcode)
+        success_count, insert_failed_rows = await replace_data(db, data, "master_sheet_test", qcode)
         failed_rows.extend(insert_failed_rows)
 
         total_duration = (time.time() - start_time) * 1000  # Convert to ms
-        logger.info(f"Replaced {success_count} records in master_sheet with qcode {qcode} in {total_duration:.2f}ms")
+        logger.info(f"Replaced {success_count} records in master_sheet_test with qcode {qcode} in {total_duration:.2f}ms")
 
         return {
             "message": f"{success_count} rows inserted, {len(failed_rows)} failed",
             "total_rows": len(data) + len(failed_rows),
             "inserted_rows": success_count,
             "failed_count": len(failed_rows),  # Failed count
-            "column_names": TABLE_COLUMNS["master_sheet"],
+            "column_names": TABLE_COLUMNS["master_sheet_test"],
             "first_error": failed_rows[0] if failed_rows else None,
             "failed_rows": failed_rows
         }
@@ -274,7 +274,7 @@ async def upload_master_sheet(
     endDate: Optional[str] = Form(None),
     db: Prisma = Depends(get_db)
 ):
-    return await upload_csv(file, qcode, startDate, endDate, db, "master_sheet")
+    return await upload_csv(file, qcode, startDate, endDate, db, "master_sheet_test")
 
 @router.post("/upload/tradebook/")
 async def upload_tradebook(
@@ -364,3 +364,21 @@ async def upload_equity_holding(
     db: Prisma = Depends(get_db)
 ):
     return await upload_csv(file, qcode, startDate, endDate, db, "equity_holding")
+
+@router.post("/upload/equity-holding-test/")
+async def upload_equity_holding_test(
+    file: UploadFile = File(...),
+    qcode: str = Form(...),
+    date: str = Form(...),
+    db: Prisma = Depends(get_db)
+):
+    return await upload_csv(file, qcode, None, None, db, "equity_holding_test")
+
+@router.post("/upload/mutual-fund-holding-test/")
+async def upload_mutual_fund_holding_test(
+    file: UploadFile = File(...),
+    qcode: str = Form(...),
+    date: str = Form(...),
+    db: Prisma = Depends(get_db)
+):
+    return await upload_csv(file, qcode, None, None, db, "mutual_fund_holding_sheet_test")

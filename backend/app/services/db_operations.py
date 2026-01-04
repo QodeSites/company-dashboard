@@ -26,25 +26,29 @@ class DatabaseConfig:
 
 # Whitelist of allowed table names to prevent SQL injection
 ALLOWED_TABLES = {
-    "master_sheet",
+    "master_sheet_test",
     "tradebook",
     "slippage",
     "mutual_fund_holding",
     "gold_tradebook",
     "liquidbees_tradebook",
     "equity_holding",
+    "equity_holding_test",
+    "mutual_fund_holding_sheet_test",
     "capital_in_out",
 }
 
 # Table-specific date field mapping
 DATE_FIELD_MAPPING = {
-    "master_sheet": "date",
+    "master_sheet_test": "date",
     "tradebook": "timestamp_entry",
     "slippage": "date",
     "mutual_fund_holding": "date",
     "gold_tradebook": "date",
     "liquidbees_tradebook": "date",
     "equity_holding": "date",
+    "equity_holding_test": "date",
+    "mutual_fund_holding_sheet_test": "as_of_date",
     "capital_in_out": "date",
 }
 
@@ -248,7 +252,7 @@ def serialize_table_item(
         "created_at": serialize_date(datetime.now(timezone.utc)),
     }
 
-    if table_name == "master_sheet":
+    if table_name == "master_sheet_test":
         return serialize_master_sheet_item(item, qcode, index)
 
     elif table_name == "tradebook":
@@ -333,6 +337,48 @@ def serialize_table_item(
             "sub_category": item.get("Sub Category") or None,
             "exposure": safe_decimal(item.get("Exposure"), "Exposure", index),
             "status": item.get("Status", "P"),  # sensible default
+        })
+
+    elif table_name == "equity_holding_test":
+        raw_date = _today_iso_kolkata()
+        base_data.update({
+            "qcode": qcode,
+            "date": serialize_date(raw_date),
+            "symbol": item.get("Symbol"),
+            "mastersheet_tag": item.get("Mastersheet Tag"),
+            "exchange": item.get("Exchange") or None,
+            "quantity": safe_int(item.get("Quantity"), "Quantity", index),
+            "avg_price": safe_decimal(item.get("Avg Price"), "Avg Price", index),
+            "broker": item.get("Broker") or None,
+            "debt_equity": item.get("Debt/Equity") or None,
+            "sub_category": item.get("Sub Category") or None,
+            "ltp": safe_decimal(item.get("LTP"), "LTP", index),
+            "buy_value": safe_decimal(item.get("Buy Value"), "Buy Value", index),
+            "value_as_of_today": safe_decimal(item.get("Value as of Today"), "Value as of Today", index),
+            "pnl_amount": safe_decimal(item.get("PNL Amount"), "PNL Amount", index),
+            "percent_pnl": safe_decimal(item.get("% PNL"), "% PNL", index) if item.get("% PNL") and str(item.get("% PNL")).lower() not in ["inf", "-inf"] else None,
+            "status": item.get("Status", "P"),
+        })
+
+    elif table_name == "mutual_fund_holding_sheet_test":
+        base_data.update({
+            "qcode": qcode,
+            "as_of_date": serialize_date(item.get("As of Date")),
+            "symbol": item.get("Symbol"),
+            "isin": item.get("ISIN"),
+            "scheme_code": item.get("Scheme Code") or None,
+            "quantity": safe_decimal(item.get("Quantity"), "Quantity", index),
+            "avg_price": safe_decimal(item.get("Avg Price"), "Avg Price", index),
+            "broker": item.get("Broker") or None,
+            "debt_equity": item.get("Debt/Equity") or None,
+            "mastersheet_tag": item.get("Mastersheet Tag"),
+            "sub_category": item.get("Sub Category") or None,
+            "nav": safe_decimal(item.get("NAV"), "NAV", index),
+            "buy_value": safe_decimal(item.get("Buy Value"), "Buy Value", index),
+            "value_as_of_today": safe_decimal(item.get("Value as of Today"), "Value as of Today", index),
+            "pnl_amount": safe_decimal(item.get("PNL Amount"), "PNL Amount", index),
+            "percent_pnl": safe_decimal(item.get("% PNL"), "% PNL", index) if item.get("% PNL") and str(item.get("% PNL")).lower() not in ["inf", "-inf"] else None,
+            "status": item.get("Status", "P"),
         })
 
     elif table_name == "capital_in_out":
