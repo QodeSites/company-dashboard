@@ -116,8 +116,8 @@ export default function MutualFundHoldingsUploadPage() {
           return;
         }
         const headers = lines[0].split(",").map((h) => h.replace(/^\uFEFF/, "").replace(/^\u00EF\u00BB\u00BF/, "").trim());
-        // Scheme Code is optional, so we don't check for it
-        const requiredCheck = requiredColumns.filter(col => col !== "Scheme Code");
+        // Scheme Code and As of Date are optional
+        const requiredCheck = requiredColumns.filter(col => col !== "Scheme Code" && col !== "As of Date");
         const missingColumns = requiredCheck.filter((col) => !headers.includes(col));
         if (missingColumns.length > 0) {
           resolve({
@@ -295,7 +295,7 @@ export default function MutualFundHoldingsUploadPage() {
               )}
             </div>
             <p className="mt-2 text-xs text-gray-500 dark:text-gray-400">
-              CSV must include columns: {requiredColumns.join(", ")} (Scheme Code is optional)
+              CSV must include columns: {requiredColumns.join(", ")} (Scheme Code and As of Date are optional - upload date will be used if As of Date is missing)
             </p>
           </div>
 
@@ -444,7 +444,7 @@ export default function MutualFundHoldingsUploadPage() {
                 <li>Make sure your CSV has all required columns with exact spelling</li>
                 <li>Ensure numeric values don't contain invalid characters</li>
                 <li>Verify that all required fields are not empty</li>
-                <li>Scheme Code is optional and can be left empty</li>
+                <li>Scheme Code and As of Date are optional - if As of Date is missing, the upload date will be used</li>
               </ul>
             </div>
           </div>
