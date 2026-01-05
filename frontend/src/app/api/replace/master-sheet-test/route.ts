@@ -5,12 +5,11 @@ export async function POST(request: NextRequest) {
   try {
     const formData = await request.formData();
     const qcode = formData.get("qcode") as string;
-    const date = formData.get("date") as string;
     const file = formData.get("file") as File;
 
-    if (!qcode || !date || !file) {
+    if (!qcode || !file) {
       return NextResponse.json(
-        { message: "Missing required fields: qcode, date, or file" },
+        { message: "Missing required fields: qcode or file" },
         { status: 400 }
       );
     }
@@ -50,19 +49,19 @@ export async function POST(request: NextRequest) {
     const headers = lines[0].split(",").map(h => h.trim().replace(/^\uFEFF/, "").replace(/^\u00EF\u00BB\u00BF/, ""));
 
     const requiredColumns = [
-      "Symbol",
-      "Mastersheet Tag",
-      "Exchange",
-      "Quantity",
-      "Avg Price",
-      "Broker",
-      "Debt/Equity",
-      "Sub Category",
-      "LTP",
-      "Buy Value",
-      "Value as of Today",
-      "PNL Amount",
-      "% PNL",
+      "Date",
+      "Portfolio Value",
+      "Cash In/Out",
+      "NAV",
+      "Prev NAV",
+      "PnL",
+      "Daily P/L %",
+      "Exposure Value",
+      "Prev Portfolio Value",
+      "Prev Exposure Value",
+      "Prev Pnl",
+      "Drawdown %",
+      "System Tag",
     ];
 
     // Check for missing columns
@@ -76,6 +75,11 @@ export async function POST(request: NextRequest) {
         { status: 400 }
       );
     }
+
+    // Delete all existing records for this qcode
+    const deletedCount = await prisma.$executeRaw`
+      DELETE FROM master_sheet_test WHERE qcode = ${qcode}
+    `;
 
     // Parse CSV rows and insert to database
     const insertedData: any[] = [];
@@ -94,36 +98,35 @@ export async function POST(request: NextRequest) {
 
       // Validate and insert
       try {
-        if (!row["Symbol"]) throw new Error("Symbol is required");
-        if (!row["Quantity"]) throw new Error("Quantity is required");
-        if (!row["Avg Price"]) throw new Error("Avg Price is required");
+        if (!row["Date"]) throw new Error("Date is required");
+        if (!row["System Tag"]) throw new Error("System Tag is required");
 
-        // Validate numeric fields
-        const quantity = parseInt(row["Quantity"]);
-        if (isNaN(quantity)) throw new Error("Invalid Quantity");
+        const date = new Date(row["Date"]);
+        if (isNaN(date.getTime())) throw new Error("Invalid Date format");
 
-        const avgPrice = parseFloat(row["Avg Price"].replace(/,/g, ""));
-        if (isNaN(avgPrice)) throw new Error("Invalid Avg Price");
-
-        const ltp = parseFloat(row["LTP"].replace(/,/g, "")) || 0;
-        const buyValue = parseFloat(row["Buy Value"].replace(/,/g, "")) || 0;
-        const valueAsOfToday = parseFloat(row["Value as of Today"].replace(/,/g, "")) || 0;
-        const pnlAmount = parseFloat(row["PNL Amount"].replace(/,/g, "")) || 0;
-        const percentPnl = row["% PNL"] && !["inf", "-inf"].includes(row["% PNL"].toLowerCase())
-          ? parseFloat(row["% PNL"].replace(/,/g, "").replace(/%/g, ""))
-          : 0;
+        // Validate and parse numeric fields
+        const portfolioValue = parseFloat(row["Portfolio Value"].replace(/,/g, "")) || 0;
+        const capitalInOut = parseFloat(row["Cash In/Out"].replace(/,/g, "")) || 0;
+        const nav = parseFloat(row["NAV"].replace(/,/g, "")) || 0;
+        const prevNav = parseFloat(row["Prev NAV"].replace(/,/g, "")) || 0;
+        const pnl = parseFloat(row["PnL"].replace(/,/g, "")) || 0;
+        const dailyPL = parseFloat(row["Daily P/L %"].replace(/,/g, "").replace(/%/g, "")) || 0;
+        const exposureValue = parseFloat(row["Exposure Value"].replace(/,/g, "")) || 0;
+        const prevPortfolioValue = parseFloat(row["Prev Portfolio Value"].replace(/,/g, "")) || 0;
+        const prevExposureValue = parseFloat(row["Prev Exposure Value"].replace(/,/g, "")) || 0;
+        const prevPnl = parseFloat(row["Prev Pnl"].replace(/,/g, "")) || 0;
+        const drawdown = parseFloat(row["Drawdown %"].replace(/,/g, "").replace(/%/g, "")) || 0;
 
         // Insert to database
         await prisma.$executeRaw`
-          INSERT INTO equity_holding_test (
-            qcode, date, symbol, mastersheet_tag, exchange, quantity, avg_price,
-            broker, debt_equity, sub_category, ltp, buy_value, value_as_of_today,
-            pnl_amount, percent_pnl
+          INSERT INTO master_sheet_test (
+            qcode, date, portfolio_value, capital_in_out, nav, prev_nav, pnl,
+            daily_p_l, exposure_value, prev_portfolio_value, prev_exposure_value,
+            prev_pnl, drawdown, system_tag
           ) VALUES (
-            ${qcode}, ${new Date(date)}, ${row["Symbol"]}, ${row["Mastersheet Tag"]},
-            ${row["Exchange"]}, ${quantity}, ${avgPrice}, ${row["Broker"]},
-            ${row["Debt/Equity"]}, ${row["Sub Category"]}, ${ltp}, ${buyValue},
-            ${valueAsOfToday}, ${pnlAmount}, ${percentPnl}
+            ${qcode}, ${date}, ${portfolioValue}, ${capitalInOut}, ${nav}, ${prevNav},
+            ${pnl}, ${dailyPL}, ${exposureValue}, ${prevPortfolioValue}, ${prevExposureValue},
+            ${prevPnl}, ${drawdown}, ${row["System Tag"]}
           )
         `;
 
@@ -138,7 +141,8 @@ export async function POST(request: NextRequest) {
     }
 
     return NextResponse.json({
-      message: `${insertedData.length} rows inserted, ${failedRows.length} failed`,
+      message: `Deleted ${deletedCount} existing records. ${insertedData.length} rows inserted, ${failedRows.length} failed`,
+      deletedCount,
       totalRows: lines.length - 1,
       insertedRows: insertedData.length,
       failedRows,
@@ -147,10 +151,10 @@ export async function POST(request: NextRequest) {
     });
 
   } catch (error: any) {
-    console.error("Error processing upload:", error);
+    console.error("Error processing replacement:", error);
     return NextResponse.json(
       {
-        message: `Upload failed: ${error.message}`,
+        message: `Replacement failed: ${error.message}`,
         error: error.message
       },
       { status: 500 }

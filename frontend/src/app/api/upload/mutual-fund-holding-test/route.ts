@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { prisma } from "@/lib/prisma";
 
 export async function POST(request: NextRequest) {
   try {
@@ -18,6 +19,18 @@ export async function POST(request: NextRequest) {
     if (!file.name.toLowerCase().endsWith(".csv")) {
       return NextResponse.json(
         { message: "File must be a CSV" },
+        { status: 400 }
+      );
+    }
+
+    // Validate account exists
+    const account = await prisma.accounts.findUnique({
+      where: { qcode },
+    });
+
+    if (!account) {
+      return NextResponse.json(
+        { message: `Invalid qcode: ${qcode}` },
         { status: 400 }
       );
     }
@@ -65,8 +78,8 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Parse CSV rows
-    const data: any[] = [];
+    // Parse CSV rows and insert to database
+    const insertedData: any[] = [];
     const failedRows: any[] = [];
 
     for (let i = 1; i < lines.length; i++) {
@@ -80,7 +93,7 @@ export async function POST(request: NextRequest) {
         row[header] = values[index] || "";
       });
 
-      // Basic validation
+      // Validate and insert
       try {
         if (!row["As of Date"]) throw new Error("As of Date is required");
         if (!row["Symbol"]) throw new Error("Symbol is required");
@@ -95,26 +108,29 @@ export async function POST(request: NextRequest) {
         const avgPrice = parseFloat(row["Avg Price"].replace(/,/g, ""));
         if (isNaN(avgPrice)) throw new Error("Invalid Avg Price");
 
-        data.push({
-          qcode,
-          as_of_date: row["As of Date"],
-          symbol: row["Symbol"],
-          isin: row["ISIN"],
-          scheme_code: row["Scheme Code"] || null,
-          quantity,
-          avg_price: avgPrice,
-          broker: row["Broker"],
-          debt_equity: row["Debt/Equity"],
-          mastersheet_tag: row["Mastersheet Tag"],
-          sub_category: row["Sub Category"],
-          nav: parseFloat(row["NAV"].replace(/,/g, "")) || 0,
-          buy_value: parseFloat(row["Buy Value"].replace(/,/g, "")) || 0,
-          value_as_of_today: parseFloat(row["Value as of Today"].replace(/,/g, "")) || 0,
-          pnl_amount: parseFloat(row["PNL Amount"].replace(/,/g, "")) || 0,
-          percent_pnl: row["% PNL"] && !["inf", "-inf"].includes(row["% PNL"].toLowerCase())
-            ? parseFloat(row["% PNL"].replace(/,/g, "").replace(/%/g, ""))
-            : null,
-        });
+        const nav = parseFloat(row["NAV"].replace(/,/g, "")) || 0;
+        const buyValue = parseFloat(row["Buy Value"].replace(/,/g, "")) || 0;
+        const valueAsOfToday = parseFloat(row["Value as of Today"].replace(/,/g, "")) || 0;
+        const pnlAmount = parseFloat(row["PNL Amount"].replace(/,/g, "")) || 0;
+        const percentPnl = row["% PNL"] && !["inf", "-inf"].includes(row["% PNL"].toLowerCase())
+          ? parseFloat(row["% PNL"].replace(/,/g, "").replace(/%/g, ""))
+          : 0;
+
+        // Insert to database
+        await prisma.$executeRaw`
+          INSERT INTO mutual_fund_holding_sheet_test (
+            qcode, as_of_date, symbol, isin, scheme_code, quantity, avg_price,
+            broker, debt_equity, mastersheet_tag, sub_category, nav, buy_value,
+            value_as_of_today, pnl_amount, percent_pnl
+          ) VALUES (
+            ${qcode}, ${new Date(row["As of Date"])}, ${row["Symbol"]}, ${row["ISIN"]},
+            ${row["Scheme Code"] || null}, ${quantity}, ${avgPrice}, ${row["Broker"]},
+            ${row["Debt/Equity"]}, ${row["Mastersheet Tag"]}, ${row["Sub Category"]},
+            ${nav}, ${buyValue}, ${valueAsOfToday}, ${pnlAmount}, ${percentPnl}
+          )
+        `;
+
+        insertedData.push(row);
       } catch (error: any) {
         failedRows.push({
           rowIndex: i + 1,
@@ -124,41 +140,13 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    // Forward to backend API
-    const backendUrl = process.env.NEXT_PUBLIC_API_BASE || "http://localhost:8000";
-    const backendFormData = new FormData();
-    backendFormData.append("qcode", qcode);
-    backendFormData.append("date", date);
-    backendFormData.append("file", file);
-
-    const backendResponse = await fetch(`${backendUrl}/api/upload/mutual-fund-holding-test/`, {
-      method: "POST",
-      body: backendFormData,
-    });
-
-    if (!backendResponse.ok) {
-      const errorData = await backendResponse.json().catch(() => ({}));
-      return NextResponse.json(
-        {
-          message: errorData.detail || "Upload failed",
-          totalRows: data.length + failedRows.length,
-          insertedRows: 0,
-          failedRows,
-          columnNames: headers,
-        },
-        { status: backendResponse.status }
-      );
-    }
-
-    const result = await backendResponse.json();
-
     return NextResponse.json({
-      message: result.message || `${data.length} rows processed successfully`,
-      totalRows: result.total_rows || data.length + failedRows.length,
-      insertedRows: result.inserted_rows || data.length,
-      failedRows: result.failed_rows || failedRows,
-      columnNames: result.column_names || headers,
-      firstError: result.first_error || (failedRows.length > 0 ? failedRows[0] : null),
+      message: `${insertedData.length} rows inserted, ${failedRows.length} failed`,
+      totalRows: lines.length - 1,
+      insertedRows: insertedData.length,
+      failedRows,
+      columnNames: headers,
+      firstError: failedRows.length > 0 ? failedRows[0] : null,
     });
 
   } catch (error: any) {
@@ -172,9 +160,3 @@ export async function POST(request: NextRequest) {
     );
   }
 }
-
-export const config = {
-  api: {
-    bodyParser: false,
-  },
-};

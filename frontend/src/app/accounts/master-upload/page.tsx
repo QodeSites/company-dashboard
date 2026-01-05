@@ -8,7 +8,6 @@ import Select from "@/components/form/Select";
 import DatePicker from "@/components/form/date-picker";
 import { Table, TableBody, TableCell, TableHeader, TableRow } from "@/components/ui/table";
 import Spinner from "@/components/spinners/Spinner";
-import { API_BASE } from "@/lib/api";
 
 interface Account {
   qcode: string;
@@ -84,7 +83,7 @@ export default function MasterUploadPage() {
   useEffect(() => {
     const fetchAccounts = async () => {
       try {
-        const res = await fetch(`${API_BASE}/api/accounts`);
+        const res = await fetch("/api/accounts");
         if (!res.ok) {
           throw new Error(`Failed to fetch accounts: ${res.status} ${res.statusText}`);
         }
@@ -220,7 +219,7 @@ export default function MasterUploadPage() {
         setIsProcessing((prev) => ({ ...prev, master_sheet: true }));
       });
       const response: UploadResponse = await new Promise((resolve, reject) => {
-        xhr.open("POST", `${API_BASE}/api/upload-csv`);
+        xhr.open("POST", "/api/upload/master-sheet-test");
         xhr.onload = () => {
           if (xhr.status >= 200 && xhr.status < 300) {
             resolve(JSON.parse(xhr.responseText));
@@ -275,7 +274,7 @@ export default function MasterUploadPage() {
     setOperationType("delete");
     setOperationResult((prev) => ({ ...prev, master_sheet: null }));
     try {
-      const res = await fetch(`${API_BASE}/api/delete-records`, {
+      const res = await fetch("/api/delete-records/master-sheet-test", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -318,7 +317,7 @@ export default function MasterUploadPage() {
     setUploadProgress((prev) => ({ ...prev, master_sheet: 0 }));
     setOperationResult((prev) => ({ ...prev, master_sheet: null }));
     try {
-      const deleteRes = await fetch(`${API_BASE}/api/delete-records`, {
+      const deleteRes = await fetch("/api/delete-records/master-sheet-test", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -347,7 +346,7 @@ export default function MasterUploadPage() {
         setIsProcessing((prev) => ({ ...prev, master_sheet: true }));
       });
       const uploadResponse: UploadResponse = await new Promise((resolve, reject) => {
-        xhr.open("POST", `${API_BASE}/api/upload-csv`);
+        xhr.open("POST", "/api/upload/master-sheet-test");
         xhr.onload = () => {
           if (xhr.status >= 200 && xhr.status < 300) {
             resolve(JSON.parse(xhr.responseText));
@@ -424,7 +423,7 @@ export default function MasterUploadPage() {
     formData.append("file", file);
     const controller = new AbortController();
     try {
-      const url = `${API_BASE}/api/replace/master-sheet/`;
+      const url = "/api/replace/master-sheet-test";
       console.log("Requesting URL:", url);
       const response = await fetch(url, {
         method: "POST",
