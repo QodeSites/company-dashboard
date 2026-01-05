@@ -37,7 +37,9 @@ export async function POST(request: NextRequest) {
 
     // Read file content
     const fileContent = await file.text();
-    const lines = fileContent.split("\n").filter(line => line.trim());
+    const lines = fileContent.split(/\r?\n/).filter(line => line.trim());
+
+    console.log(`Total lines in CSV (including header): ${lines.length}`);
 
     if (lines.length < 2) {
       return NextResponse.json(
@@ -79,9 +81,18 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // Delete all existing records for this qcode
+    const deletedCount = await prisma.$executeRaw`
+      DELETE FROM mutual_fund_holding_sheet_test WHERE qcode = ${qcode}
+    `;
+
+    console.log(`Deleted ${deletedCount} existing records for qcode: ${qcode}`);
+
     // Parse CSV rows and insert to database
     const insertedData: any[] = [];
     const failedRows: any[] = [];
+
+    console.log(`Starting to process ${lines.length - 1} data rows`);
 
     for (let i = 1; i < lines.length; i++) {
       const line = lines[i].trim();
@@ -143,8 +154,11 @@ export async function POST(request: NextRequest) {
       }
     }
 
+    console.log(`Finished processing. Inserted: ${insertedData.length}, Failed: ${failedRows.length}`);
+
     return NextResponse.json({
-      message: `${insertedData.length} rows inserted, ${failedRows.length} failed`,
+      message: `Deleted ${deletedCount} existing records. ${insertedData.length} rows inserted, ${failedRows.length} failed`,
+      deletedCount,
       totalRows: lines.length - 1,
       insertedRows: insertedData.length,
       failedRows,
