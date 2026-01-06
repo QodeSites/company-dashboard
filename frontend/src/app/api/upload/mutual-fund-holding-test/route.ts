@@ -112,9 +112,6 @@ export async function POST(request: NextRequest) {
         if (!row["Quantity"]) throw new Error("Quantity is required");
         if (!row["Avg Price"]) throw new Error("Avg Price is required");
 
-        // Use upload date if As of Date is not provided
-        const asOfDate = row["As of Date"] ? new Date(row["As of Date"]) : new Date(date);
-
         // Validate numeric fields
         const quantity = parseFloat(row["Quantity"].replace(/,/g, ""));
         if (isNaN(quantity)) throw new Error("Invalid Quantity");
@@ -137,7 +134,7 @@ export async function POST(request: NextRequest) {
             broker, debt_equity, mastersheet_tag, sub_category, nav, buy_value,
             value_as_of_today, pnl_amount, percent_pnl
           ) VALUES (
-            ${qcode}, ${asOfDate}, ${row["Symbol"]}, ${row["ISIN"]},
+            ${qcode}, ${new Date(date)}, ${row["Symbol"]}, ${row["ISIN"]},
             ${row["Scheme Code"] || null}, ${quantity}, ${avgPrice}, ${row["Broker"]},
             ${row["Debt/Equity"]}, ${row["Mastersheet Tag"]}, ${row["Sub Category"]},
             ${nav}, ${buyValue}, ${valueAsOfToday}, ${pnlAmount}, ${percentPnl}
