@@ -81,10 +81,6 @@ async def api_root():
         }
     }
 
-@app.get("/env")
-async def check_env():
-    return {"DATABASE_URL": os.getenv("DATABASE_URL"), "SECRET_KEY": os.getenv("SECRET_KEY")}
-
 @app.get("/api/routes")
 async def list_routes():
     """List all available API routes"""
